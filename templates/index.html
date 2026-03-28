@@ -4,106 +4,132 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Room Temperature Heatmap 3D</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap" rel="stylesheet">
     <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #1c1208; color: #f0e6d6; min-height: 100vh;
+            background: #1a2630; color: #e8e0d8; min-height: 100vh;
         }
 
-        /* Header con marca TECHNEBRIOS */
+        /* Header compacto */
         .header {
-            background: #bf6a1a; padding: 10px 24px; text-align: center;
-            border-bottom: 3px solid #8a4a0e;
+            background: #344955; padding: 4px 16px; text-align: center;
+            border-bottom: 2px solid #E8B830;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .header-left {
+            display: flex; align-items: center; gap: 12px;
         }
         .header h1 {
-            font-size: 1.6rem; color: #fff; font-weight: 800;
-            letter-spacing: 4px; text-transform: uppercase;
+            font-size: 1.1rem; color: #E8B830; font-weight: 800;
+            letter-spacing: 4px; text-transform: uppercase; margin: 0;
         }
         .header .subtitle {
-            font-size: 0.7rem; color: rgba(255,255,255,0.8);
-            letter-spacing: 3px; text-transform: uppercase; margin-top: 1px;
+            font-size: 0.55rem; color: rgba(255,255,255,0.7);
+            letter-spacing: 3px; text-transform: uppercase;
         }
         .header .conn-line {
-            font-size: 0.75rem; color: rgba(255,255,255,0.7); margin-top: 4px;
+            font-size: 0.6rem; color: rgba(255,255,255,0.6);
         }
+        .header-center {
+            display: flex; flex-direction: column; align-items: center;
+            font-size: 0.8rem; color: #E8B830;
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 2px;
+            text-shadow: 0 0 8px rgba(232,184,48,0.4);
+        }
+        .header-right {
+            display: flex; align-items: center; gap: 4px;
+        }
+        .condor-logo {
+            display: flex; flex-direction: column; align-items: flex-end;
+            line-height: 1;
+        }
+        .condor-logo .condor-ing {
+            font-size: 0.45rem; color: #8aa0b0; font-weight: 600;
+            letter-spacing: 2px; text-transform: uppercase;
+        }
+        .condor-logo .condor-name {
+            font-size: 1rem; color: #fff; font-weight: 800;
+            letter-spacing: 3px; text-transform: uppercase;
+        }
+        .condor-swoosh {
+            display: flex; flex-direction: column; align-items: flex-end; gap: 2px; margin-left: 2px;
+        }
+        .condor-swoosh span {
+            display: block; height: 3px; border-radius: 2px;
+        }
+        .condor-swoosh .sw1 {
+            width: 22px; background: #E8B830; position: relative;
+        }
+        .condor-swoosh .sw1::before {
+            content: ''; position: absolute; left: -5px; top: -2px;
+            width: 7px; height: 7px; background: #E8B830; border-radius: 50%;
+        }
+        .condor-swoosh .sw2 { width: 18px; background: #8aa0b0; }
+        .condor-swoosh .sw3 { width: 18px; background: #8aa0b0; }
         .dashboard {
             display: flex; flex-direction: column;
-            height: calc(100vh - 68px); padding: 8px 12px; overflow: hidden;
+            height: calc(100vh - 34px); padding: 4px 8px;
+            overflow: hidden;
         }
-
-        /* Fila superior: tarjetas de estado */
-        .status-bar {
-            display: flex; gap: 8px; justify-content: center;
-            flex-wrap: wrap; margin-bottom: 8px; flex-shrink: 0;
-        }
-        .status-card {
-            background: #2a1e10; border-radius: 8px; padding: 6px 14px;
-            text-align: center; min-width: 110px; border: 1px solid #5a3a18;
-        }
-        .status-card .label {
-            font-size: 0.6rem; color: #a08060; text-transform: uppercase;
-            letter-spacing: 1px; margin-bottom: 2px;
-        }
-        .status-card .value { font-size: 1.2rem; font-weight: bold; }
-        .status-card .value.temp { color: #e8a030; }
-        .status-card .value.sensor { color: #e8a030; }
-        .status-card .value.on { color: #6dbf5a; }
-        .status-card .value.off { color: #d44; }
-        .status-card .value.waiting { color: #665540; }
 
         /* Layout principal: render 3D izquierda + panel indicadores derecha */
         .main-row {
-            display: flex; gap: 10px; flex: 1; min-height: 0;
+            display: flex; gap: 6px; flex: 1; min-height: 0;
+        }
+        .render-column {
+            flex: 1; display: flex; flex-direction: column; min-width: 0;
         }
         #scene-container {
-            flex: 1; background: #2a1e10; border-radius: 10px; padding: 8px;
-            border: 1px solid #5a3a18; min-width: 0;
+            flex: 1; background: #243B4A; border-radius: 8px 8px 0 0; padding: 4px;
+            border: 1px solid #3a5a6a; min-width: 0; min-height: 0;
         }
         #scene3d { width: 100%; height: 100%; }
 
         /* Panel lateral de indicadores */
         .side-panel {
-            width: 320px; flex-shrink: 0; display: flex; flex-direction: column;
-            gap: 8px; overflow-y: auto;
+            width: 300px; flex-shrink: 0; display: flex; flex-direction: column;
+            gap: 4px; overflow: hidden;
         }
         .indicators-section {
-            padding: 10px; background: #2a1e10; border-radius: 10px;
-            border: 1px solid #5a3a18;
+            padding: 6px 8px; background: #243B4A; border-radius: 8px;
+            border: 1px solid #3a5a6a;
         }
         .indicators-section h2 {
-            font-size: 0.8rem; color: #d4853a; margin-bottom: 8px;
-            border-bottom: 1px solid #5a3a18; padding-bottom: 4px;
+            font-size: 0.7rem; color: #E8B830; margin-bottom: 4px;
+            border-bottom: 1px solid #3a5a6a; padding-bottom: 2px;
         }
 
         /* Termómetros verticales de temperatura */
         .thermometers-row {
-            display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+            display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
         }
         .thermometer {
             display: flex; flex-direction: column; align-items: center;
-            min-width: 46px;
+            min-width: 40px;
         }
         .thermometer .thermo-label {
-            font-size: 0.65rem; color: #a08060; text-transform: uppercase;
-            letter-spacing: 1px; margin-bottom: 2px;
+            font-size: 0.6rem; color: #8aa0b0; text-transform: uppercase;
+            letter-spacing: 1px; margin-bottom: 1px;
         }
         .thermometer .thermo-value {
-            font-size: 0.75rem; font-weight: bold; color: #e8a030; margin-bottom: 4px;
+            font-size: 0.65rem; font-weight: bold; color: #E8B830; margin-bottom: 2px;
         }
         .thermo-bar-wrap {
             display: flex; align-items: stretch; gap: 3px;
         }
         .thermo-scale {
             display: flex; flex-direction: column; justify-content: space-between;
-            font-size: 0.55rem; color: #7a6040; min-width: 22px; text-align: right;
+            font-size: 0.5rem; color: #607888; min-width: 20px; text-align: right;
             padding: 1px 0;
         }
         .thermo-track {
-            width: 16px; height: 90px; background: #1a1008;
+            width: 14px; height: 70px; background: #1a2630;
             border-radius: 8px; position: relative;
-            border: 1px solid #4a3218;
+            border: 1px solid #3a5060;
         }
         .thermo-fill {
             position: absolute; bottom: 0; left: 0; right: 0;
@@ -119,22 +145,22 @@
 
         /* Barras horizontales (humedad / amoníaco) */
         .hbars-row {
-            display: flex; flex-direction: column; gap: 6px;
+            display: flex; flex-direction: column; gap: 3px;
         }
         .hbar-item {
-            display: flex; align-items: center; gap: 6px;
+            display: flex; align-items: center; gap: 4px;
         }
         .hbar-label {
-            font-size: 0.65rem; color: #a08060; text-transform: uppercase;
-            letter-spacing: 1px; min-width: 55px; text-align: right;
+            font-size: 0.55rem; color: #8aa0b0; text-transform: uppercase;
+            letter-spacing: 1px; min-width: 50px; text-align: right;
         }
         .hbar-track-wrap {
             flex: 1; display: flex; flex-direction: column;
         }
         .hbar-track {
-            width: 100%; height: 14px; background: #1a1008;
+            width: 100%; height: 12px; background: #1a2630;
             border-radius: 7px; position: relative;
-            border: 1px solid #4a3218;
+            border: 1px solid #3a5060;
         }
         .hbar-fill {
             position: absolute; top: 0; left: 0; bottom: 0;
@@ -149,54 +175,260 @@
         }
         .hbar-scale {
             display: flex; justify-content: space-between;
-            font-size: 0.5rem; color: #7a6040; padding: 1px 2px 0;
+            font-size: 0.5rem; color: #607888; padding: 1px 2px 0;
         }
         .hbar-value {
-            font-size: 0.75rem; font-weight: bold; color: #e8a030;
-            min-width: 55px;
+            font-size: 0.65rem; font-weight: bold; color: #E8B830;
+            min-width: 50px;
+        }
+
+        /* Widgets de dispositivos (ventilador / extractor) */
+        .devices-row {
+            display: flex; gap: 10px; justify-content: center;
+        }
+        .device-widget {
+            display: flex; flex-direction: column; align-items: center; min-width: 60px;
+        }
+        .device-widget .device-label {
+            font-size: 0.55rem; color: #8aa0b0; text-transform: uppercase;
+            letter-spacing: 1px; margin-bottom: 2px;
+        }
+        .device-widget .device-status {
+            font-size: 0.65rem; font-weight: bold; margin-top: 2px;
+        }
+        .device-widget .device-status.on { color: #6dbf5a; }
+        .device-widget .device-status.off { color: #d44; }
+        .fan-icon {
+            width: 30px; height: 30px; position: relative;
+        }
+        .fan-blade {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            transition: none;
+        }
+        .fan-blade.spinning {
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Botón toggle temperatura / humedad */
+        .mode-toggle {
+            position: absolute; top: 8px; left: 8px; z-index: 10;
+            display: flex; border-radius: 6px; overflow: hidden;
+            border: 1px solid #3a5a6a;
+        }
+        .mode-toggle button {
+            background: #243B4A; color: #8aa0b0; border: none;
+            padding: 4px 10px; font-size: 0.6rem; cursor: pointer;
+            font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+        }
+        .mode-toggle button.active {
+            background: #E8B830; color: #1a2630;
+        }
+
+        /* Panel de historial */
+        .history-panel {
+            position: absolute; top: 8px; right: 8px; z-index: 10;
+            display: flex; align-items: center; gap: 6px;
+            background: rgba(36,59,74,0.9); border-radius: 6px;
+            border: 1px solid #3a5a6a; padding: 4px 8px;
+        }
+        .history-panel input[type="date"] {
+            background: #1a2630; color: #E8B830; border: 1px solid #3a5a6a;
+            border-radius: 4px; padding: 2px 4px; font-size: 0.55rem;
+            font-family: inherit;
+        }
+        .history-panel button {
+            background: #E8B830; color: #1a2630; border: none;
+            border-radius: 4px; padding: 3px 8px; font-size: 0.55rem;
+            cursor: pointer; font-weight: 700; text-transform: uppercase;
+        }
+        .history-panel button:disabled {
+            opacity: 0.5; cursor: not-allowed;
+        }
+        .history-panel .hist-label {
+            font-size: 0.5rem; color: #8aa0b0; text-transform: uppercase;
+        }
+
+        /* Slider de tiempo (debajo del render) */
+        .time-slider-wrap {
+            display: none; padding: 2px 8px; background: #243B4A;
+            border-radius: 0 0 8px 8px; border: 1px solid #3a5a6a;
+            border-top: none; align-items: center; gap: 8px; flex-shrink: 0;
+        }
+        .time-slider-wrap.visible { display: flex; }
+        .time-slider-wrap input[type="range"] {
+            flex: 1; accent-color: #E8B830; height: 6px;
+        }
+        .time-slider-wrap .ts-label {
+            font-size: 0.6rem; color: #E8B830; font-family: monospace;
+            min-width: 130px;
+        }
+        .time-slider-wrap button {
+            background: #344955; color: #8aa0b0; border: 1px solid #3a5a6a;
+            border-radius: 4px; padding: 2px 8px; font-size: 0.55rem;
+            cursor: pointer; font-weight: 600;
         }
 
         .footer { display: none; }
+
+        /* ---- Responsive: móvil vertical (<768px) ---- */
+        @media (max-width: 768px) {
+            .header {
+                flex-wrap: wrap; justify-content: center; gap: 4px; padding: 6px 8px;
+            }
+            .header-left { gap: 6px; }
+            .header h1 { font-size: 0.9rem; letter-spacing: 2px; }
+            .header .subtitle { font-size: 0.45rem; letter-spacing: 2px; }
+            .header-center { font-size: 0.6rem; letter-spacing: 1px; }
+            .header-right { display: none; }
+
+            body {
+                overflow-y: auto !important;
+            }
+            .dashboard {
+                height: auto !important;
+                overflow: visible !important;
+                padding: 4px;
+            }
+            .main-row {
+                flex-direction: column !important;
+                flex: none !important;
+                gap: 4px;
+            }
+            .render-column {
+                height: 350px !important;
+                max-height: 350px !important;
+                flex: none !important;
+                overflow: hidden !important;
+            }
+            #scene-container {
+                border-radius: 8px;
+                position: static !important;
+                flex: 1;
+                overflow: hidden !important;
+                max-height: 100% !important;
+            }
+            #scene3d {
+                max-height: 330px !important;
+            }
+            .side-panel {
+                width: 100% !important;
+                overflow: visible !important;
+                gap: 6px;
+                flex-shrink: 0;
+            }
+            .indicators-section {
+                padding: 8px 10px;
+            }
+
+            .history-panel {
+                position: static; flex-wrap: wrap; justify-content: center;
+                margin: 4px 0; border-radius: 8px;
+            }
+            .mode-toggle {
+                position: static; margin: 4px auto; justify-content: center;
+            }
+
+            .time-slider-wrap { border-radius: 0 0 8px 8px; }
+
+            .thermometers-row { gap: 14px; justify-content: space-around; }
+            .thermo-track { height: 65px; width: 16px; }
+            .thermometer .thermo-value { font-size: 0.7rem; }
+
+            .hbar-track { height: 18px; }
+            .hbar-label { min-width: 55px; font-size: 0.6rem; }
+            .hbar-value { font-size: 0.7rem; }
+            .hbar-scale { font-size: 0.55rem; }
+
+            .devices-row { gap: 30px; }
+            .fan-icon { width: 40px; height: 40px; }
+            .device-widget .device-label { font-size: 0.65rem; }
+            .device-widget .device-status { font-size: 0.75rem; }
+        }
+
+        /* ---- Responsive: móvil horizontal / tablet ---- */
+        @media (max-width: 900px) and (orientation: landscape) {
+            body { overflow: auto !important; }
+            .dashboard {
+                height: auto !important;
+                overflow: visible !important;
+                min-height: calc(100vh - 34px);
+            }
+            .main-row {
+                flex-direction: column !important;
+                flex: none !important;
+            }
+            .render-column {
+                height: 55vh !important;
+                min-height: 250px !important;
+                flex: none !important;
+            }
+            .side-panel {
+                width: 100% !important;
+                overflow: visible !important;
+            }
+            .header-right { display: none !important; }
+            .header-center { font-size: 0.55rem !important; }
+        }
         .connection-dot {
             display: inline-block; width: 10px; height: 10px;
             border-radius: 50%; margin-right: 6px; vertical-align: middle;
         }
         .connection-dot.ok { background: #6dbf5a; }
         .connection-dot.err { background: #d44; }
-        .connection-dot.warn { background: #e8a030; }
+        .connection-dot.warn { background: #E8B830; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>TECHNEBR<span style="opacity:0.5">|</span>OS</h1>
-        <div class="subtitle">SUPER ALIMÉNTATE</div>
-        <div class="conn-line">
-            <span id="conn-dot" class="connection-dot err"></span>
-            <span id="conn-status">Connecting...</span>
+        <div class="header-left">
+            <div>
+                <h1>TECHNEBR<span style="opacity:0.5">|</span>OS</h1>
+                <div class="subtitle">SUPER ALIMÉNTATE</div>
+            </div>
+            <div class="conn-line"><span id="conn-dot" class="connection-dot err"></span><span id="conn-status">Connecting...</span></div>
+        </div>
+        <div class="header-center">
+            <span id="mqtt-timestamp">--</span>
+        </div>
+        <div class="header-right">
+            <div class="condor-logo">
+                <span class="condor-ing">Ingenieria</span>
+                <span class="condor-name">CONDOR</span>
+            </div>
+            <div class="condor-swoosh">
+                <span class="sw1"></span>
+                <span class="sw2"></span>
+                <span class="sw3"></span>
+            </div>
         </div>
     </div>
 
     <div class="dashboard">
-        <!-- Status cards row -->
-        <div class="status-bar">
-            <div class="status-card">
-                <div class="label">Exterior (TEX)</div>
-                <div class="value temp" id="ext-temp">-- &deg;C</div>
-            </div>
-            <div class="status-card">
-                <div class="label">Fan (Ventilador)</div>
-                <div class="value waiting" id="fan-status">--</div>
-            </div>
-            <div class="status-card">
-                <div class="label">Extractor</div>
-                <div class="value waiting" id="ext-status">--</div>
-            </div>
-        </div>
-
         <!-- Fila principal: render 3D + panel lateral -->
         <div class="main-row">
-            <div id="scene-container">
+            <div class="render-column">
+            <div id="scene-container" style="position:relative;">
+                <div class="mode-toggle">
+                    <button id="btn-temp" class="active" onclick="setHeatmapMode('temp')">Temperatura</button>
+                    <button id="btn-hum" onclick="setHeatmapMode('humidity')">Humedad</button>
+                </div>
+                <div class="history-panel">
+                    <span class="hist-label">Historial:</span>
+                    <input type="date" id="hist-start">
+                    <input type="date" id="hist-end">
+                    <button id="btn-load-hist" onclick="loadHistory()">Cargar</button>
+                </div>
                 <div id="scene3d"></div>
+            </div>
+            <div class="time-slider-wrap" id="time-slider-wrap">
+                <span class="ts-label" id="ts-label">--</span>
+                <input type="range" id="time-slider" min="0" max="0" value="0" oninput="onTimeSlider(this.value)">
+                <button onclick="exitHistory()">En vivo</button>
+            </div>
             </div>
 
             <div class="side-panel">
@@ -208,40 +440,40 @@
                             <div class="thermo-label">T1</div>
                             <div class="thermo-value" id="thermo-val-t1">--</div>
                             <div class="thermo-bar-wrap">
-                                <div class="thermo-scale"><span>32°</span><span>25°</span><span>18°</span></div>
-                                <div class="thermo-track"><div class="thermo-mark" style="bottom:35.7%" title="23°C"></div><div class="thermo-mark" style="bottom:71.4%" title="28°C"></div><div class="thermo-fill" id="thermo-fill-t1"></div></div>
+                                <div class="thermo-scale"><span>35°</span><span>25°</span><span>14°</span></div>
+                                <div class="thermo-track"><div class="thermo-mark" style="bottom:42.9%" title="23°C"></div><div class="thermo-mark" style="bottom:66.7%" title="28°C"></div><div class="thermo-fill" id="thermo-fill-t1"></div></div>
                             </div>
                         </div>
                         <div class="thermometer" id="thermo-t2">
                             <div class="thermo-label">T2</div>
                             <div class="thermo-value" id="thermo-val-t2">--</div>
                             <div class="thermo-bar-wrap">
-                                <div class="thermo-scale"><span>32°</span><span>25°</span><span>18°</span></div>
-                                <div class="thermo-track"><div class="thermo-mark" style="bottom:35.7%" title="23°C"></div><div class="thermo-mark" style="bottom:71.4%" title="28°C"></div><div class="thermo-fill" id="thermo-fill-t2"></div></div>
+                                <div class="thermo-scale"><span>35°</span><span>25°</span><span>14°</span></div>
+                                <div class="thermo-track"><div class="thermo-mark" style="bottom:42.9%" title="23°C"></div><div class="thermo-mark" style="bottom:66.7%" title="28°C"></div><div class="thermo-fill" id="thermo-fill-t2"></div></div>
                             </div>
                         </div>
                         <div class="thermometer" id="thermo-t3">
                             <div class="thermo-label">T3</div>
                             <div class="thermo-value" id="thermo-val-t3">--</div>
                             <div class="thermo-bar-wrap">
-                                <div class="thermo-scale"><span>32°</span><span>25°</span><span>18°</span></div>
-                                <div class="thermo-track"><div class="thermo-mark" style="bottom:35.7%" title="23°C"></div><div class="thermo-mark" style="bottom:71.4%" title="28°C"></div><div class="thermo-fill" id="thermo-fill-t3"></div></div>
+                                <div class="thermo-scale"><span>35°</span><span>25°</span><span>14°</span></div>
+                                <div class="thermo-track"><div class="thermo-mark" style="bottom:42.9%" title="23°C"></div><div class="thermo-mark" style="bottom:66.7%" title="28°C"></div><div class="thermo-fill" id="thermo-fill-t3"></div></div>
                             </div>
                         </div>
                         <div class="thermometer" id="thermo-t4">
                             <div class="thermo-label">T4</div>
                             <div class="thermo-value" id="thermo-val-t4">--</div>
                             <div class="thermo-bar-wrap">
-                                <div class="thermo-scale"><span>32°</span><span>25°</span><span>18°</span></div>
-                                <div class="thermo-track"><div class="thermo-mark" style="bottom:35.7%" title="23°C"></div><div class="thermo-mark" style="bottom:71.4%" title="28°C"></div><div class="thermo-fill" id="thermo-fill-t4"></div></div>
+                                <div class="thermo-scale"><span>35°</span><span>25°</span><span>14°</span></div>
+                                <div class="thermo-track"><div class="thermo-mark" style="bottom:42.9%" title="23°C"></div><div class="thermo-mark" style="bottom:66.7%" title="28°C"></div><div class="thermo-fill" id="thermo-fill-t4"></div></div>
                             </div>
                         </div>
                         <div class="thermometer" id="thermo-t5">
                             <div class="thermo-label">T5</div>
                             <div class="thermo-value" id="thermo-val-t5">--</div>
                             <div class="thermo-bar-wrap">
-                                <div class="thermo-scale"><span>32°</span><span>25°</span><span>18°</span></div>
-                                <div class="thermo-track"><div class="thermo-mark" style="bottom:35.7%" title="23°C"></div><div class="thermo-mark" style="bottom:71.4%" title="28°C"></div><div class="thermo-fill" id="thermo-fill-t5"></div></div>
+                                <div class="thermo-scale"><span>35°</span><span>25°</span><span>14°</span></div>
+                                <div class="thermo-track"><div class="thermo-mark" style="bottom:42.9%" title="23°C"></div><div class="thermo-mark" style="bottom:66.7%" title="28°C"></div><div class="thermo-fill" id="thermo-fill-t5"></div></div>
                             </div>
                         </div>
                     </div>
@@ -254,24 +486,24 @@
                         <div class="hbar-item">
                             <div class="hbar-label">Exterior</div>
                             <div class="hbar-track-wrap">
-                                <div class="hbar-track"><div class="hbar-mark" style="left:35.7%" title="23°C"></div><div class="hbar-mark" style="left:71.4%" title="28°C"></div><div class="hbar-fill" id="hbar-fill-tex"></div></div>
-                                <div class="hbar-scale"><span>18°</span><span>23°</span><span>25°</span><span>28°</span><span>32°</span></div>
+                                <div class="hbar-track"><div class="hbar-mark" style="left:42.9%" title="23°C"></div><div class="hbar-mark" style="left:66.7%" title="28°C"></div><div class="hbar-fill" id="hbar-fill-tex"></div></div>
+                                <div class="hbar-scale"><span>14°</span><span>23°</span><span>25°</span><span>28°</span><span>35°</span></div>
                             </div>
                             <div class="hbar-value" id="hbar-val-tex">--</div>
                         </div>
                         <div class="hbar-item">
                             <div class="hbar-label">Superior</div>
                             <div class="hbar-track-wrap">
-                                <div class="hbar-track"><div class="hbar-mark" style="left:35.7%" title="23°C"></div><div class="hbar-mark" style="left:71.4%" title="28°C"></div><div class="hbar-fill" id="hbar-fill-tps"></div></div>
-                                <div class="hbar-scale"><span>18°</span><span>23°</span><span>25°</span><span>28°</span><span>32°</span></div>
+                                <div class="hbar-track"><div class="hbar-mark" style="left:42.9%" title="23°C"></div><div class="hbar-mark" style="left:66.7%" title="28°C"></div><div class="hbar-fill" id="hbar-fill-tps"></div></div>
+                                <div class="hbar-scale"><span>14°</span><span>23°</span><span>25°</span><span>28°</span><span>35°</span></div>
                             </div>
                             <div class="hbar-value" id="hbar-val-tps">--</div>
                         </div>
                         <div class="hbar-item">
                             <div class="hbar-label">Inferior</div>
                             <div class="hbar-track-wrap">
-                                <div class="hbar-track"><div class="hbar-mark" style="left:35.7%" title="23°C"></div><div class="hbar-mark" style="left:71.4%" title="28°C"></div><div class="hbar-fill" id="hbar-fill-tpi"></div></div>
-                                <div class="hbar-scale"><span>18°</span><span>23°</span><span>25°</span><span>28°</span><span>32°</span></div>
+                                <div class="hbar-track"><div class="hbar-mark" style="left:42.9%" title="23°C"></div><div class="hbar-mark" style="left:66.7%" title="28°C"></div><div class="hbar-fill" id="hbar-fill-tpi"></div></div>
+                                <div class="hbar-scale"><span>14°</span><span>23°</span><span>25°</span><span>28°</span><span>35°</span></div>
                             </div>
                             <div class="hbar-value" id="hbar-val-tpi">--</div>
                         </div>
@@ -347,6 +579,39 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Dispositivos (ventilador y extractor) -->
+                <div class="indicators-section">
+                    <h2>Dispositivos</h2>
+                    <div class="devices-row">
+                        <div class="device-widget">
+                            <div class="device-label">Ventilador</div>
+                            <div class="fan-icon">
+                                <svg class="fan-blade" id="fan-blade" viewBox="0 0 36 36">
+                                    <circle cx="18" cy="18" r="3" fill="#8aa0b0"/>
+                                    <path d="M18 15 Q22 6 18 1 Q14 6 18 15Z" fill="#8aa0b0"/>
+                                    <path d="M21 18 Q30 14 35 18 Q30 22 21 18Z" fill="#8aa0b0"/>
+                                    <path d="M18 21 Q14 30 18 35 Q22 30 18 21Z" fill="#8aa0b0"/>
+                                    <path d="M15 18 Q6 22 1 18 Q6 14 15 18Z" fill="#8aa0b0"/>
+                                </svg>
+                            </div>
+                            <div class="device-status off" id="fan-status">OFF</div>
+                        </div>
+                        <div class="device-widget">
+                            <div class="device-label">Extractor</div>
+                            <div class="fan-icon">
+                                <svg class="fan-blade" id="ext-blade" viewBox="0 0 36 36">
+                                    <circle cx="18" cy="18" r="3" fill="#8aa0b0"/>
+                                    <path d="M18 15 Q22 6 18 1 Q14 6 18 15Z" fill="#8aa0b0"/>
+                                    <path d="M21 18 Q30 14 35 18 Q30 22 21 18Z" fill="#8aa0b0"/>
+                                    <path d="M18 21 Q14 30 18 35 Q22 30 18 21Z" fill="#8aa0b0"/>
+                                    <path d="M15 18 Q6 22 1 18 Q6 14 15 18Z" fill="#8aa0b0"/>
+                                </svg>
+                            </div>
+                            <div class="device-status off" id="ext-status">OFF</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -357,6 +622,27 @@
         const REFRESH_MS = {{ refresh_ms }};
         const FETCH_TIMEOUT_MS = 5000;
         let plotInitialized = false;
+        let heatmapMode = 'temp'; // 'temp' o 'humidity'
+        let lastData = null;
+
+        // Colorscale de humedad: azul fuerte → azul claro → verde → rojo
+        const HUMIDITY_COLORSCALE = [
+            [0,    'rgb(0,40,220)'],      // 0% — azul fuerte
+            [0.4,  'rgb(0,200,255)'],     // 40% — azul claro
+            [0.6,  'rgb(0,200,100)'],     // 60% — verde-cyan
+            [0.7,  'rgb(0,220,0)'],       // 70% — verde (ideal)
+            [0.8,  'rgb(0,200,0)'],       // 80% — verde
+            [0.9,  'rgb(220,160,0)'],     // 90% — naranja
+            [1,    'rgb(220,40,0)'],      // 100% — rojo
+        ];
+
+        function setHeatmapMode(mode) {
+            heatmapMode = mode;
+            document.getElementById('btn-temp').className = mode === 'temp' ? 'active' : '';
+            document.getElementById('btn-hum').className = mode === 'humidity' ? 'active' : '';
+            plotInitialized = false;
+            if (lastData) buildScene(lastData);
+        }
 
         // Colorscale: blue (cold <20) -> green (ideal 20-30) -> red (hot >30)
         // Mapped to VMIN=15..VMAX=40: 20C=0.2, 25C=0.4, 30C=0.6
@@ -446,6 +732,41 @@
             edge([exX, hiWinY, exZ], [exX + exSize, hiWinY, exZ + exSize]);
             edge([exX + exSize, hiWinY, exZ], [exX, hiWinY, exZ + exSize]);
 
+            // Mueble de madera debajo de las 3 ventanas (Y=6), despegado 0.3 del suelo
+            const mX0 = 1, mX1 = 9, mY0 = 5.5, mY1 = y1, mZ0 = 0.3, mZ1 = 1.0;
+            // Base inferior
+            edge([mX0,mY0,mZ0],[mX1,mY0,mZ0]); edge([mX1,mY0,mZ0],[mX1,mY1,mZ0]);
+            edge([mX1,mY1,mZ0],[mX0,mY1,mZ0]); edge([mX0,mY1,mZ0],[mX0,mY0,mZ0]);
+            // Superficie superior
+            edge([mX0,mY0,mZ1],[mX1,mY0,mZ1]); edge([mX1,mY0,mZ1],[mX1,mY1,mZ1]);
+            edge([mX1,mY1,mZ1],[mX0,mY1,mZ1]); edge([mX0,mY1,mZ1],[mX0,mY0,mZ1]);
+            // Pilares verticales (4 esquinas)
+            edge([mX0,mY0,mZ0],[mX0,mY0,mZ1]); edge([mX1,mY0,mZ0],[mX1,mY0,mZ1]);
+            edge([mX1,mY1,mZ0],[mX1,mY1,mZ1]); edge([mX0,mY1,mZ0],[mX0,mY1,mZ1]);
+            // Patas (del suelo a la base del mueble)
+            edge([mX0,mY0,0],[mX0,mY0,mZ0]); edge([mX1,mY0,0],[mX1,mY0,mZ0]);
+            edge([mX1,mY1,0],[mX1,mY1,mZ0]); edge([mX0,mY1,0],[mX0,mY1,mZ0]);
+            // Divisiones internas (gabetas) — 4 puertas iguales en el frente
+            const mZmid = (mZ0 + mZ1) / 2;
+            const gabW = (mX1 - mX0) / 4;
+            for (let g = 0; g <= 4; g++) {
+                const gx = mX0 + g * gabW;
+                // Divisores verticales (frente del mueble)
+                if (g > 0 && g < 4) {
+                    edge([gx,mY0,mZ0],[gx,mY0,mZ1]);
+                }
+            }
+            // Línea horizontal media (divide gabetas arriba y abajo)
+            edge([mX0,mY0,mZmid],[mX1,mY0,mZmid]);
+            // Tiradores de las gabetas (punto medio de cada puerta)
+            for (let g = 0; g < 4; g++) {
+                const gxc = mX0 + g * gabW + gabW / 2;
+                // Tirador superior
+                edge([gxc - 0.15, mY0, mZmid + 0.12], [gxc + 0.15, mY0, mZmid + 0.12]);
+                // Tirador inferior
+                edge([gxc - 0.15, mY0, mZmid - 0.12], [gxc + 0.15, mY0, mZmid - 0.12]);
+            }
+
             // Jardinera en posición X=2, Y=6 (pared trasera)
             const px_p0 = 1, px_p1 = 3;
             const py_p0 = y1, py_p1 = y1 + 0.3;
@@ -468,7 +789,7 @@
             return {
                 type: 'scatter3d', mode: 'lines',
                 x: rx, y: ry, z: rz,
-                line: { color: 'rgba(208,168,120,0.5)', width: 3 },
+                line: { color: 'rgba(180,200,220,0.5)', width: 3 },
                 hoverinfo: 'skip', showlegend: false,
             };
         }
@@ -498,83 +819,69 @@
         function updateDashboard(data) {
             updateConnectionStatus(true, data.mqtt_connected);
 
-            // Individual sensor cards
-            for (const [label, info] of Object.entries(data.sensors)) {
-                const el = document.getElementById('val-' + label);
-                if (el) {
-                    el.innerHTML = info.value !== null
-                        ? info.value.toFixed(1) + ' &deg;C' : '-- &deg;C';
-                }
+            // Timestamp MQTT
+            const tsEl = document.getElementById('mqtt-timestamp');
+            tsEl.textContent = data.last_update || '--';
+
+            // Ventilador: aspas + estado
+            const fanEl = document.getElementById('fan-status');
+            const fanBlade = document.getElementById('fan-blade');
+            fanEl.textContent = data.fan_on ? 'ON' : 'OFF';
+            fanEl.className = 'device-status ' + (data.fan_on ? 'on' : 'off');
+            if (data.fan_on) {
+                fanBlade.classList.add('spinning');
+            } else {
+                fanBlade.classList.remove('spinning');
             }
 
-            // Exterior temp
-            const extEl = document.getElementById('ext-temp');
-            extEl.innerHTML = data.exterior_temp !== null
-                ? data.exterior_temp.toFixed(1) + ' &deg;C' : '-- &deg;C';
-
-            // Fan / Extractor
-            const fanEl = document.getElementById('fan-status');
-            fanEl.textContent = data.fan_on ? 'ON' : 'OFF';
-            fanEl.className = 'value ' + (data.fan_on ? 'on' : 'off');
-
+            // Extractor: aspas + estado
             const extSt = document.getElementById('ext-status');
+            const extBlade = document.getElementById('ext-blade');
             extSt.textContent = data.extractor_on ? 'ON' : 'OFF';
-            extSt.className = 'value ' + (data.extractor_on ? 'on' : 'off');
+            extSt.className = 'device-status ' + (data.extractor_on ? 'on' : 'off');
+            if (data.extractor_on) {
+                extBlade.classList.add('spinning');
+            } else {
+                extBlade.classList.remove('spinning');
+            }
         }
 
         // ---------------------------------------------------------------
         // Funciones de color para indicadores
         // ---------------------------------------------------------------
 
-        // Temperatura: 18°C azul → 25°C verde → 32°C rojo
-        function tempColor(value) {
-            const t = Math.max(18, Math.min(32, value));
-            let r, g, b;
-            if (t <= 25) {
-                // azul (0,80,255) → verde (0,200,0)
-                const p = (t - 18) / 7;
-                r = 0;
-                g = Math.round(80 + p * 120);
-                b = Math.round(255 - p * 255);
-            } else {
-                // verde (0,200,0) → rojo (220,40,0)
-                const p = (t - 25) / 7;
-                r = Math.round(p * 220);
-                g = Math.round(200 - p * 160);
-                b = 0;
+        // Interpola color usando una colorscale de Plotly (mismos colores que el render)
+        function interpolateColorscale(colorscale, t) {
+            // t normalizado entre 0 y 1
+            t = Math.max(0, Math.min(1, t));
+            // Buscar segmento
+            let i = 0;
+            for (; i < colorscale.length - 1; i++) {
+                if (t <= colorscale[i + 1][0]) break;
             }
+            const [t0, c0] = colorscale[i];
+            const [t1, c1] = colorscale[Math.min(i + 1, colorscale.length - 1)];
+            const p = t1 > t0 ? (t - t0) / (t1 - t0) : 0;
+            // Parsear rgb(r,g,b)
+            const parse = (s) => s.match(/\d+/g).map(Number);
+            const [r0, g0, b0] = parse(c0);
+            const [r1, g1, b1] = parse(c1);
+            const r = Math.round(r0 + p * (r1 - r0));
+            const g = Math.round(g0 + p * (g1 - g0));
+            const b = Math.round(b0 + p * (b1 - b0));
             return `rgb(${r},${g},${b})`;
         }
 
-        // Humedad: <40% azul fuerte → <60% azul claro → 60-70% verde → >90% rojo
+        // Temperatura: usa la misma TEMP_COLORSCALE del render (14-35°C)
+        function tempColor(value) {
+            const t = (value - 14) / (35 - 14); // normalizar 0..1
+            return interpolateColorscale(TEMP_COLORSCALE, t);
+        }
+
+        // Humedad: usa la misma HUMIDITY_COLORSCALE del render (0-100%)
         function humidityColor(value) {
-            const h = Math.max(0, Math.min(100, value));
-            let r, g, b;
-            if (h <= 40) {
-                // azul muy fuerte
-                r = 0; g = 40; b = 220;
-            } else if (h <= 60) {
-                // azul fuerte → azul claro
-                const p = (h - 40) / 20;
-                r = 0;
-                g = Math.round(40 + p * 160);
-                b = Math.round(220 + p * 35);
-            } else if (h <= 70) {
-                // azul claro → verde
-                const p = (h - 60) / 10;
-                r = 0;
-                g = Math.round(200 + p * 20);
-                b = Math.round(255 - p * 255);
-            } else if (h <= 90) {
-                // verde → rojo
-                const p = (h - 70) / 20;
-                r = Math.round(p * 220);
-                g = Math.round(220 - p * 180);
-                b = 0;
-            } else {
-                // rojo (peligroso)
-                r = 220; g = 40; b = 0;
-            }
+            const t = value / 100; // normalizar 0..1
+            return interpolateColorscale(HUMIDITY_COLORSCALE, t);
             return `rgb(${r},${g},${b})`;
         }
 
@@ -605,7 +912,7 @@
         // ---------------------------------------------------------------
         function updateIndicators(data) {
             // Termómetros de temperatura (rango 18-32 para la barra)
-            const TEMP_BAR_MIN = 18, TEMP_BAR_MAX = 32;
+            const TEMP_BAR_MIN = 14, TEMP_BAR_MAX = 35;
             for (const [label, info] of Object.entries(data.sensors)) {
                 const valEl = document.getElementById('thermo-val-' + label);
                 const fillEl = document.getElementById('thermo-fill-' + label);
@@ -700,20 +1007,28 @@
         // 3D scene builder
         // ---------------------------------------------------------------
         function buildScene(data) {
-            if (!data.volume_data) return;
+            lastData = data;
 
-            const vol = data.volume_data;
+            // Seleccionar volumen según modo
+            const isTemp = heatmapMode === 'temp';
+            const vol = isTemp ? data.volume_data : data.humidity_volume_data;
+            if (!vol) return;
 
-            // Compute actual data range
+            const colorscale = isTemp ? TEMP_COLORSCALE : HUMIDITY_COLORSCALE;
+            const cmin = isTemp ? data.vmin : 0;
+            const cmax = isTemp ? data.vmax : 100;
+            const unit = isTemp ? '°C' : '%';
+            const labelType = isTemp ? 'Temp' : 'Hum';
+
+            // Rango real de datos para el volumen
             let volMin = Infinity, volMax = -Infinity;
             for (let i = 0; i < vol.value.length; i++) {
                 if (vol.value[i] < volMin) volMin = vol.value[i];
                 if (vol.value[i] > volMax) volMax = vol.value[i];
             }
 
-            // Multiple isosurface slices to fill the entire room with color
-            // Use fixed range from config (data.vmin / data.vmax) for consistent colors
-            const nSlices = 10;
+            // Múltiples isosuperficies para llenar el cuarto con color
+            const nSlices = 5;
             const step = (volMax - volMin) / nSlices;
             const isoTraces = [];
             for (let s = 0; s < nSlices; s++) {
@@ -727,26 +1042,34 @@
                     isomax: hi,
                     surface: { show: true, count: 2 },
                     caps: { x: {show: true}, y: {show: true}, z: {show: true} },
-                    colorscale: TEMP_COLORSCALE,
-                    cmin: data.vmin,
-                    cmax: data.vmax,
+                    colorscale: colorscale,
+                    cmin: cmin,
+                    cmax: cmax,
                     opacity: 0.35,
                     showscale: s === 0,
                     colorbar: s === 0 ? {
-                        title: { text: '°C', font: { color: '#c0a080', size: 14 } },
-                        tickfont: { color: '#c0a080', size: 11 },
+                        title: { text: unit, font: { color: '#8aa0b0', size: 14 } },
+                        tickfont: { color: '#8aa0b0', size: 11 },
                         len: 0.6, thickness: 18,
                     } : undefined,
-                    hovertemplate: 'X: %{x:.1f}m<br>Y: %{y:.1f}m<br>Z: %{z:.1f}m<br>Temp: %{value:.1f} °C<extra></extra>',
+                    hovertemplate: 'X: %{x:.1f}m<br>Y: %{y:.1f}m<br>Z: %{z:.1f}m<br>' + labelType + ': %{value:.1f} ' + unit + '<extra></extra>',
                 });
             }
 
-            // Sensor markers (white dots)
+            // Sensor markers — cambian según modo temp/humedad
             const sx = [], sy = [], sz = [], sHover = [];
+            const sensorKeys = Object.keys(data.sensors);
+            const humLabels = {'t1':'h1','t2':'h2','t3':'h3','t4':'h4','t5':'h5'};
             for (const [label, info] of Object.entries(data.sensors)) {
                 sx.push(info.x); sy.push(info.y); sz.push(info.z);
-                const val = info.value !== null ? info.value.toFixed(1) + ' °C' : '--';
-                sHover.push('<b>' + label + '</b>: ' + val + '<br>Z: ' + info.z.toFixed(1) + 'm');
+                if (isTemp) {
+                    const val = info.value !== null ? info.value.toFixed(1) + ' °C' : '--';
+                    sHover.push('<b>' + label + '</b>: ' + val + '<br>Z: ' + info.z.toFixed(1) + 'm');
+                } else {
+                    const hKey = humLabels[label];
+                    const hVal = hKey && data.humidity[hKey] !== null ? data.humidity[hKey].toFixed(1) + ' %' : '--';
+                    sHover.push('<b>' + (hKey || label) + '</b>: ' + hVal + '<br>Z: ' + info.z.toFixed(1) + 'm');
+                }
             }
             if (data.tex_sensor) {
                 const tex = data.tex_sensor;
@@ -779,6 +1102,94 @@
             };
 
             // Zona exterior: esfera de color según temperatura exterior
+            // Lámparas vintage circulares en posiciones T1 (2,3) y T3 (8,3)
+            // Barra de metal desde el techo hasta Z=z1 (línea de pared), pantalla circular, foquito
+            const lampTraces = [];
+            const lampPositions = [{x: 2, y: 3}, {x: 8, y: 3}];
+            const zWall = data.z_range[1]; // línea de la pared (Z=3)
+            for (const lp of lampPositions) {
+                const zCeil = zWall + 1.5 - (lp.y / 6) * 1.5;
+                const lampBottom = zWall - 0.1; // justo debajo de la línea de pared
+                const shadeR = 0.35; // radio de la pantalla circular
+                const shadeZ = lampBottom; // Z de la pantalla
+                const nSeg = 16; // segmentos del círculo
+
+                // Barra de metal (línea del techo al borde superior de la pantalla)
+                const barX = [], barY = [], barZ = [];
+                barX.push(lp.x, lp.x, null);
+                barY.push(lp.y, lp.y, null);
+                barZ.push(zCeil, shadeZ + 0.05, null);
+                lampTraces.push({
+                    type: 'scatter3d', mode: 'lines',
+                    x: barX, y: barY, z: barZ,
+                    line: { color: '#888', width: 4 },
+                    hoverinfo: 'skip', showlegend: false,
+                });
+
+                // Pantalla circular vintage (anillo)
+                const ringX = [], ringY = [], ringZ = [];
+                for (let i = 0; i <= nSeg; i++) {
+                    const a = (i / nSeg) * 2 * Math.PI;
+                    ringX.push(lp.x + shadeR * Math.cos(a));
+                    ringY.push(lp.y + shadeR * Math.sin(a));
+                    ringZ.push(shadeZ);
+                }
+                lampTraces.push({
+                    type: 'scatter3d', mode: 'lines',
+                    x: ringX, y: ringY, z: ringZ,
+                    line: { color: '#8B6914', width: 5 },
+                    hoverinfo: 'skip', showlegend: false,
+                });
+
+                // Pantalla sólida (disco con mesh3d)
+                const discX = [lp.x], discY = [lp.y], discZ = [shadeZ];
+                const discI = [], discJ = [], discK = [];
+                for (let i = 0; i < nSeg; i++) {
+                    const a = (i / nSeg) * 2 * Math.PI;
+                    discX.push(lp.x + shadeR * Math.cos(a));
+                    discY.push(lp.y + shadeR * Math.sin(a));
+                    discZ.push(shadeZ);
+                    discI.push(0);
+                    discJ.push(i + 1);
+                    discK.push(i < nSeg - 1 ? i + 2 : 1);
+                }
+                lampTraces.push({
+                    type: 'mesh3d',
+                    x: discX, y: discY, z: discZ,
+                    i: discI, j: discJ, k: discK,
+                    color: '#8B6914',
+                    opacity: 0.6,
+                    flatshading: true,
+                    hoverinfo: 'skip', showlegend: false,
+                });
+
+                // Foquito (esfera pequeña debajo de la pantalla)
+                lampTraces.push({
+                    type: 'scatter3d', mode: 'markers',
+                    x: [lp.x], y: [lp.y], z: [shadeZ - 0.12],
+                    marker: { size: 8, color: '#FFD700', symbol: 'circle',
+                              line: { color: '#FFA500', width: 1 } },
+                    hoverinfo: 'skip', showlegend: false,
+                });
+            }
+
+            // Mueble sólido (mesh3d) — caja con 6 caras
+            const fm = {x0:1, x1:9, y0:5.5, y1:6, z0:0.3, z1:1.0};
+            const furnitureTrace = {
+                type: 'mesh3d',
+                x: [fm.x0,fm.x1,fm.x1,fm.x0, fm.x0,fm.x1,fm.x1,fm.x0],
+                y: [fm.y0,fm.y0,fm.y1,fm.y1, fm.y0,fm.y0,fm.y1,fm.y1],
+                z: [fm.z0,fm.z0,fm.z0,fm.z0, fm.z1,fm.z1,fm.z1,fm.z1],
+                i: [0,0, 0,0, 0,0, 4,4, 1,1, 3,3],
+                j: [1,2, 1,5, 3,7, 5,6, 2,6, 2,6],
+                k: [2,3, 5,4, 7,4, 6,7, 6,5, 6,7],
+                color: '#6b4226',
+                opacity: 0.7,
+                flatshading: true,
+                hoverinfo: 'skip',
+                showlegend: false,
+            };
+
             const extZoneTraces = [];
             if (data.tex_sensor && data.tex_sensor.value !== null) {
                 const tex = data.tex_sensor;
@@ -799,9 +1210,11 @@
                 });
             }
 
-            // Sensor name labels (white, above marker)
+            // Sensor name labels — cambian según modo
             const nameTexts = [];
-            for (const label of Object.keys(data.sensors)) nameTexts.push(label);
+            for (const label of Object.keys(data.sensors)) {
+                nameTexts.push(isTemp ? label : (humLabels[label] || label));
+            }
             if (data.tex_sensor) nameTexts.push('tex');
 
             const nameTrace = {
@@ -813,10 +1226,16 @@
                 hoverinfo: 'skip', showlegend: false,
             };
 
-            // Sensor value labels (orange, below name)
+            // Sensor value labels — cambian según modo
             const valTexts = [];
-            for (const info of Object.values(data.sensors)) {
-                valTexts.push(info.value !== null ? info.value.toFixed(1) + ' °C' : '--');
+            for (const [label, info] of Object.entries(data.sensors)) {
+                if (isTemp) {
+                    valTexts.push(info.value !== null ? info.value.toFixed(1) + ' °C' : '--');
+                } else {
+                    const hKey = humLabels[label];
+                    const hVal = hKey && data.humidity[hKey] !== null ? data.humidity[hKey].toFixed(1) + ' %' : '--';
+                    valTexts.push(hVal);
+                }
             }
             if (data.tex_sensor) {
                 const texv = data.tex_sensor.value;
@@ -849,34 +1268,34 @@
             // House wireframe
             const house = buildHouseStructure(data.x_range, data.y_range, data.z_range);
 
-            const traces = [...isoTraces, house, ...extZoneTraces, dropLines, markerTrace, nameTrace, valTrace];
+            const traces = [...isoTraces, house, furnitureTrace, ...lampTraces, ...extZoneTraces, dropLines, markerTrace, nameTrace, valTrace];
 
             const roofPeak = data.z_range[1] + 1.5;
             const layout = {
                 paper_bgcolor: 'rgba(0,0,0,0)',
                 plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#c0a080' },
+                font: { color: '#8aa0b0' },
                 margin: { t: 10, r: 10, b: 10, l: 10 },
                 showlegend: false,
                 scene: {
                     xaxis: {
                         title: 'X (m)', range: [data.x_range[0] - 0.5, data.x_range[1] + 0.5],
-                        color: '#a08060', gridcolor: '#3a2a14', backgroundcolor: '#1a1008',
+                        color: '#a08060', gridcolor: '#2a4050', backgroundcolor: '#1a2630',
                     },
                     yaxis: {
                         title: 'Y (m)', range: [data.y_range[0] - 1, data.y_range[1] + 0.5],
-                        color: '#a08060', gridcolor: '#3a2a14', backgroundcolor: '#1a1008',
+                        color: '#a08060', gridcolor: '#2a4050', backgroundcolor: '#1a2630',
                     },
                     zaxis: {
                         title: 'Z (m)', range: [0, roofPeak + 0.3],
-                        color: '#a08060', gridcolor: '#3a2a14', backgroundcolor: '#1a1008',
+                        color: '#a08060', gridcolor: '#2a4050', backgroundcolor: '#1a2630',
                     },
                     aspectratio: { x: 2, y: 1.2, z: 1 },
                     camera: {
                         eye: { x: 1.6, y: -1.8, z: 1.0 },
                         up: { x: 0, y: 0, z: 1 },
                     },
-                    bgcolor: '#1a1008',
+                    bgcolor: '#1a2630',
                 },
             };
 
@@ -895,6 +1314,129 @@
         // ---------------------------------------------------------------
         // Data polling with timeout
         // ---------------------------------------------------------------
+        // ---------------------------------------------------------------
+        // Historial de datos desde Ubidots
+        // ---------------------------------------------------------------
+        let historyData = null;
+        let historyMode = false;
+
+        async function loadHistory() {
+            const startVal = document.getElementById('hist-start').value;
+            const endVal = document.getElementById('hist-end').value;
+            if (!startVal || !endVal) return;
+
+            const btn = document.getElementById('btn-load-hist');
+            btn.disabled = true;
+            btn.textContent = 'Cargando...';
+
+            try {
+                const resp = await fetch(`/api/history?start=${startVal}&end=${endVal}`);
+                if (!resp.ok) throw new Error('Error');
+                historyData = await resp.json();
+
+                if (historyData.timestamps.length === 0) {
+                    btn.textContent = 'Sin datos';
+                    setTimeout(() => { btn.textContent = 'Cargar'; btn.disabled = false; }, 2000);
+                    return;
+                }
+
+                // Configurar slider
+                const slider = document.getElementById('time-slider');
+                slider.min = 0;
+                slider.max = historyData.timestamps.length - 1;
+                slider.value = historyData.timestamps.length - 1;
+
+                historyMode = true;
+                document.getElementById('time-slider-wrap').classList.add('visible');
+                onTimeSlider(slider.value);
+
+                btn.textContent = 'Cargar';
+                btn.disabled = false;
+            } catch (e) {
+                btn.textContent = 'Error';
+                setTimeout(() => { btn.textContent = 'Cargar'; btn.disabled = false; }, 2000);
+            }
+        }
+
+        let sliderTimeout = null;
+        function onTimeSlider(idx) {
+            if (!historyData || !historyData.timestamps.length) return;
+
+            const ts = historyData.timestamps[idx];
+            const date = new Date(ts);
+            document.getElementById('ts-label').textContent =
+                date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+
+            // Debounce: esperar 200ms antes de hacer la petición
+            if (sliderTimeout) clearTimeout(sliderTimeout);
+            sliderTimeout = setTimeout(() => renderHistoryFrame(ts), 200);
+        }
+
+        async function renderHistoryFrame(ts) {
+            // Buscar el valor más cercano al timestamp para cada variable
+            function findClosest(varData, targetTs) {
+                if (!varData || varData.length === 0) return null;
+                let closest = varData[0];
+                let minDiff = Math.abs(varData[0].timestamp - targetTs);
+                for (const v of varData) {
+                    const diff = Math.abs(v.timestamp - targetTs);
+                    if (diff < minDiff) { minDiff = diff; closest = v; }
+                    if (diff > minDiff) break;
+                }
+                return minDiff < 300000 ? closest.value : null;
+            }
+
+            const tempValues = {};
+            for (const [label, values] of Object.entries(historyData.temperature)) {
+                tempValues[label] = findClosest(values, ts);
+            }
+            const humValues = {};
+            for (const [label, values] of Object.entries(historyData.humidity)) {
+                humValues[label] = findClosest(values, ts);
+            }
+
+            // Pedir interpolación al servidor
+            try {
+                const params = new URLSearchParams({
+                    temps: JSON.stringify(tempValues),
+                    hums: JSON.stringify(humValues),
+                });
+                const resp = await fetch('/api/history/interpolate?' + params);
+                if (!resp.ok) return;
+                const volumes = await resp.json();
+
+                if (lastData) {
+                    const histData = JSON.parse(JSON.stringify(lastData));
+                    for (const [label, val] of Object.entries(tempValues)) {
+                        if (histData.sensors[label] && val !== null) {
+                            histData.sensors[label].value = val;
+                        }
+                    }
+                    for (const [label, val] of Object.entries(humValues)) {
+                        if (val !== null) histData.humidity[label] = val;
+                    }
+                    if (volumes.volume_data) histData.volume_data = volumes.volume_data;
+                    if (volumes.humidity_volume_data) histData.humidity_volume_data = volumes.humidity_volume_data;
+
+                    updateIndicators(histData);
+                    plotInitialized = false;
+                    buildScene(histData);
+                }
+            } catch (e) {
+                // Error silencioso al mover el slider
+            }
+        }
+
+        function exitHistory() {
+            historyMode = false;
+            historyData = null;
+            document.getElementById('time-slider-wrap').classList.remove('visible');
+            plotInitialized = false;
+        }
+
+        // ---------------------------------------------------------------
+        // Polling de datos en tiempo real
+        // ---------------------------------------------------------------
         async function fetchData() {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -905,8 +1447,10 @@
                 if (!resp.ok) throw new Error('API error');
                 const data = await resp.json();
                 updateDashboard(data);
-                updateIndicators(data);
-                buildScene(data);
+                if (!historyMode) {
+                    updateIndicators(data);
+                    buildScene(data);
+                }
             } catch (err) {
                 clearTimeout(timeoutId);
                 updateConnectionStatus(false, false);

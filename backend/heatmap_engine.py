@@ -7,6 +7,7 @@ Almacena las últimas temperaturas de los sensores y produce un volumen
 
 import logging
 import threading
+from datetime import datetime
 from typing import Optional
 
 import numpy as np
@@ -36,6 +37,7 @@ class HeatmapEngine:
         self._avg_temp_inferior: Optional[float] = None
         self._humidity: dict[str, float] = {}
         self._ammonia_ppm: Optional[float] = None
+        self._last_update: Optional[str] = None
 
         self._sensor_labels = list(config.SENSOR_POSITIONS.keys())
         self._sensor_coords = np.array(
@@ -65,6 +67,7 @@ class HeatmapEngine:
         Los valores fuera del rango físico válido se descartan silenciosamente.
         """
         with self._lock:
+            self._last_update = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             for label in self._sensor_labels:
                 if label in data:
                     value = data[label]
@@ -151,6 +154,47 @@ class HeatmapEngine:
             "value": volume.tolist(),
         }
 
+    def interpolate_humidity_volume(self) -> Optional[dict]:
+        """Retorna volumen 3D de humedad interpolada, o None si no hay datos suficientes.
+
+        Los sensores h1-h5 comparten posiciones con t1-t5.
+        """
+        humidity_map = {"h1": 0, "h2": 1, "h3": 2, "h4": 3, "h5": 4}
+        with self._lock:
+            values = []
+            coords = []
+            for hlabel, idx in humidity_map.items():
+                if hlabel in self._humidity:
+                    values.append(self._humidity[hlabel])
+                    coords.append(self._sensor_coords[idx])
+
+        if len(values) < 3:
+            return None
+
+        coords_arr = np.array(coords)
+        values_arr = np.array(values)
+
+        volume = griddata(
+            coords_arr, values_arr, self._grid_points, method="nearest"
+        )
+        try:
+            linear = griddata(
+                coords_arr, values_arr, self._grid_points, method="linear"
+            )
+            valid = ~np.isnan(linear)
+            volume[valid] = linear[valid]
+        except Exception:
+            pass
+
+        np.clip(volume, 0, 100, out=volume)
+
+        return {
+            "x": self._grid_x.tolist(),
+            "y": self._grid_y.tolist(),
+            "z": self._grid_z.tolist(),
+            "value": volume.tolist(),
+        }
+
     # ------------------------------------------------------------------
     # Accesores
     # ------------------------------------------------------------------
@@ -186,3 +230,7 @@ class HeatmapEngine:
     def get_ammonia_ppm(self) -> Optional[float]:
         with self._lock:
             return self._ammonia_ppm
+
+    def get_last_update(self) -> Optional[str]:
+        with self._lock:
+            return self._last_update

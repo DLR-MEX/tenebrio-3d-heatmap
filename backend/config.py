@@ -57,8 +57,8 @@ GRID_RES_Y = 18
 GRID_RES_Z = 12
 
 # Rango de temperatura para visualización (ideal: 20-30 °C)
-HEATMAP_VMIN = 15.0
-HEATMAP_VMAX = 40.0
+HEATMAP_VMIN = 14.0
+HEATMAP_VMAX = 35.0
 
 # Rango válido de temperatura física (rechazar lecturas fuera de este rango)
 TEMP_VALID_MIN = -10.0

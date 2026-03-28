@@ -26,15 +26,24 @@ Returns JSON data for the 3D heatmap visualization.
     "z": [0.0, 0.272, ...],
     "value": [24.5, 24.6, ...]
   },
+  "humidity_volume_data": {
+    "x": [0.0, 0.416, ...],
+    "y": [0.0, 0.352, ...],
+    "z": [0.0, 0.272, ...],
+    "value": [45.0, 46.2, ...]
+  },
   "x_range": [0, 10],
   "y_range": [0, 6],
   "z_range": [0, 3],
-  "vmin": 15.0,
-  "vmax": 40.0,
-  "exterior_temp": 25.0,
+  "vmin": 14.0,
+  "vmax": 35.0,
+  "exterior_temp": 23.0,
+  "avg_temp_superior": 26.2,
+  "avg_temp_inferior": 21.9,
   "fan_on": true,
-  "extractor_on": false,
+  "extractor_on": true,
   "mqtt_connected": true,
+  "last_update": "2026-03-27 18:30:45",
   "sensors": {
     "t1": {"x": 2, "y": 3, "z": 2.5, "value": 25.3},
     "t2": {"x": 5, "y": 3, "z": 2.5, "value": 24.5},
@@ -43,22 +52,20 @@ Returns JSON data for the 3D heatmap visualization.
     "t5": {"x": 7, "y": 3, "z": 1.0, "value": 23.0}
   },
   "tex_sensor": {
-    "x": 6.5,
-    "y": -0.15,
+    "x": 2,
+    "y": 6.15,
     "z": 0.8,
-    "value": 25.0
+    "value": 23.0
   },
-  "avg_temp_superior": 25.5,
-  "avg_temp_inferior": 23.0,
   "humidity": {
     "h1": 46.0,
     "h2": 21.0,
     "h3": 46.0,
     "h4": 44.0,
     "h5": 43.0,
-    "hum_general": null
+    "hum_general": 38.0
   },
-  "amoniaco": null
+  "amoniaco": 0.0
 }
 ```
 
@@ -66,22 +73,65 @@ Returns JSON data for the 3D heatmap visualization.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `volume_data` | object or null | Interpolated 3D volume with flat arrays `x`, `y`, `z`, `value`. Null if fewer than 3 sensors have reported. |
+| `volume_data` | object or null | Interpolated 3D temperature volume. Null if fewer than 3 sensors reported. |
+| `humidity_volume_data` | object or null | Interpolated 3D humidity volume. Null if fewer than 3 sensors reported. |
 | `x_range` | array | Room X boundaries in meters `[min, max]`. |
 | `y_range` | array | Room Y boundaries in meters `[min, max]`. |
 | `z_range` | array | Room Z boundaries in meters `[min, max]`. |
-| `vmin` | float | Minimum temperature for the color scale. |
-| `vmax` | float | Maximum temperature for the color scale. |
+| `vmin` | float | Minimum temperature for the color scale (14°C). |
+| `vmax` | float | Maximum temperature for the color scale (35°C). |
 | `exterior_temp` | float or null | Latest exterior sensor (tex) reading. |
 | `avg_temp_superior` | float or null | Average upper sensors temperature (tps). |
 | `avg_temp_inferior` | float or null | Average lower sensors temperature (tpi). |
 | `fan_on` | boolean | Whether the fan is currently on. |
 | `extractor_on` | boolean | Whether the extractor is currently on. |
 | `mqtt_connected` | boolean | Whether the MQTT client is connected to the broker. |
-| `sensors` | object | Per-sensor position and latest value. Value is null if no reading received yet. |
+| `last_update` | string or null | Timestamp of last MQTT message received. |
+| `sensors` | object | Per-sensor position and latest value. |
 | `tex_sensor` | object | Exterior sensor position and latest value. |
-| `humidity` | object | Per-sensor humidity values (h1–h5, hum_general). Value is null if no reading received yet. |
+| `humidity` | object | Per-sensor humidity values (h1–h5, hum_general). |
 | `amoniaco` | float or null | Latest ammonia sensor reading in PPM. |
+
+## GET /api/history
+
+Returns historical temperature and humidity data from Ubidots API.
+
+- **Parameters:**
+  - `start` (required): Start date in `YYYY-MM-DD` format
+  - `end` (required): End date in `YYYY-MM-DD` format
+- **Response:** JSON object with timestamped values per variable
+
+### Example Request
+
+```
+GET /api/history?start=2026-03-25&end=2026-03-27
+```
+
+### Response
+
+```json
+{
+  "timestamps": [1711324800000, 1711324802000, ...],
+  "temperature": {
+    "t1": [{"timestamp": 1711324800000, "value": 25.3}, ...],
+    "t2": [...],
+    ...
+  },
+  "humidity": {
+    "h1": [{"timestamp": 1711324800000, "value": 46.0}, ...],
+    ...
+  }
+}
+```
+
+## GET /api/history/interpolate
+
+Interpolates a 3D volume for a specific moment using provided sensor values.
+
+- **Parameters:**
+  - `temps` (required): JSON string with temperature values, e.g. `{"t1":25,"t2":24,...}`
+  - `hums` (optional): JSON string with humidity values, e.g. `{"h1":46,"h2":21,...}`
+- **Response:** JSON with `volume_data` and `humidity_volume_data`
 
 ### Error Response (503)
 
