@@ -24,9 +24,9 @@ SENSOR_POSITIONS = {
     "t5": (7, 3, 1.0),
 }
 
-# Posición del sensor de temperatura exterior (sobre jardinera, pared lateral Y=0)
-# La jardinera se ubica en X=5.5..7.5, Y=-0.3..0, Z=0..0.7
-TEX_POSITION = (6.5, -0.15, 0.8)
+# Posición del sensor de temperatura exterior (sobre jardinera, pared trasera Y=6)
+# La jardinera se ubica en X=1..3, Y=6..6.3, Z=0..0.7
+TEX_POSITION = (2, 6.15, 0.8)
 
 # Límites del cuarto (metros)
 ROOM_X_MIN = 0

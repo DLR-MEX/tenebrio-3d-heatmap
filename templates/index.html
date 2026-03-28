@@ -252,7 +252,7 @@
                     <h2>Temperaturas promedio</h2>
                     <div class="hbars-row">
                         <div class="hbar-item">
-                            <div class="hbar-label">TEX</div>
+                            <div class="hbar-label">Exterior</div>
                             <div class="hbar-track-wrap">
                                 <div class="hbar-track"><div class="hbar-mark" style="left:35.7%" title="23°C"></div><div class="hbar-mark" style="left:71.4%" title="28°C"></div><div class="hbar-fill" id="hbar-fill-tex"></div></div>
                                 <div class="hbar-scale"><span>18°</span><span>23°</span><span>25°</span><span>28°</span><span>32°</span></div>
@@ -260,7 +260,7 @@
                             <div class="hbar-value" id="hbar-val-tex">--</div>
                         </div>
                         <div class="hbar-item">
-                            <div class="hbar-label">TPS</div>
+                            <div class="hbar-label">Superior</div>
                             <div class="hbar-track-wrap">
                                 <div class="hbar-track"><div class="hbar-mark" style="left:35.7%" title="23°C"></div><div class="hbar-mark" style="left:71.4%" title="28°C"></div><div class="hbar-fill" id="hbar-fill-tps"></div></div>
                                 <div class="hbar-scale"><span>18°</span><span>23°</span><span>25°</span><span>28°</span><span>32°</span></div>
@@ -268,7 +268,7 @@
                             <div class="hbar-value" id="hbar-val-tps">--</div>
                         </div>
                         <div class="hbar-item">
-                            <div class="hbar-label">TPI</div>
+                            <div class="hbar-label">Inferior</div>
                             <div class="hbar-track-wrap">
                                 <div class="hbar-track"><div class="hbar-mark" style="left:35.7%" title="23°C"></div><div class="hbar-mark" style="left:71.4%" title="28°C"></div><div class="hbar-fill" id="hbar-fill-tpi"></div></div>
                                 <div class="hbar-scale"><span>18°</span><span>23°</span><span>25°</span><span>28°</span><span>32°</span></div>
@@ -325,10 +325,10 @@
                         <div class="hbar-item">
                             <div class="hbar-label">General</div>
                             <div class="hbar-track-wrap">
-                                <div class="hbar-track"><div class="hbar-mark" style="left:60%" title="60%"></div><div class="hbar-mark" style="left:88%" title="88%"></div><div class="hbar-fill" id="hbar-fill-humidity_general"></div></div>
+                                <div class="hbar-track"><div class="hbar-mark" style="left:60%" title="60%"></div><div class="hbar-mark" style="left:88%" title="88%"></div><div class="hbar-fill" id="hbar-fill-hum_general"></div></div>
                                 <div class="hbar-scale"><span>0</span><span>40</span><span>60</span><span>70</span><span>90</span><span>100%</span></div>
                             </div>
-                            <div class="hbar-value" id="hbar-val-humidity_general">--%</div>
+                            <div class="hbar-value" id="hbar-val-hum_general">--%</div>
                         </div>
                     </div>
                 </div>
@@ -397,19 +397,58 @@
             // Pillars
             edge([x0,y0,z0],[x0,y0,z1]); edge([x1,y0,z0],[x1,y0,z1]);
             edge([x1,y1,z0],[x1,y1,z1]); edge([x0,y1,z0],[x0,y1,z1]);
-            // Roof
-            edge([x1,y0,z1],[x1,yMid,roofPeak]); edge([x1,y1,z1],[x1,yMid,roofPeak]);
-            edge([x0,y0,z1],[x0,yMid,roofPeak]); edge([x0,y1,z1],[x0,yMid,roofPeak]);
-            edge([x0,yMid,roofPeak],[x1,yMid,roofPeak]);
+            // Techo inclinado: punto alto en Y=0, cae hacia Y=6 (triángulo escaleno)
+            edge([x0,y0,roofPeak],[x1,y0,roofPeak]);   // cumbrera en Y=0
+            edge([x0,y0,z1],[x0,y0,roofPeak]);          // pilar izq Y=0 sube al pico
+            edge([x1,y0,z1],[x1,y0,roofPeak]);          // pilar der Y=0 sube al pico
+            edge([x0,y0,roofPeak],[x0,y1,z1]);           // caída izq hacia Y=6
+            edge([x1,y0,roofPeak],[x1,y1,z1]);           // caída der hacia Y=6
             // Door on back wall (X=0)
             const doorY0 = 2.5, doorY1 = 3.5;
             edge([x0,doorY0,z0],[x0,doorY0,doorZ1]);
             edge([x0,doorY0,doorZ1],[x0,doorY1,doorZ1]);
             edge([x0,doorY1,doorZ1],[x0,doorY1,z0]);
 
-            // Planter box on left side wall (Y=0), ~3/4 along X from door
-            const py_p0 = y0 - 0.3, py_p1 = y0; // depth: sticks out 0.3m
-            const px_p0 = 5.5, px_p1 = 7.5;      // ~3/4 of wall (X=0..10)
+            // 3 ventanas en pared Y=6, equidistantes, ancho 1m, alto Z=1..2
+            const winY = y1, winZ0 = 1.0, winZ1 = 2.0;
+            const winPositions = [1.75, 4.5, 7.25];
+            for (const wx of winPositions) {
+                edge([wx, winY, winZ0], [wx + 1, winY, winZ0]);
+                edge([wx + 1, winY, winZ0], [wx + 1, winY, winZ1]);
+                edge([wx + 1, winY, winZ1], [wx, winY, winZ1]);
+                edge([wx, winY, winZ1], [wx, winY, winZ0]);
+                // Cruz interior de la ventana
+                edge([wx + 0.5, winY, winZ0], [wx + 0.5, winY, winZ1]);
+                edge([wx, winY, (winZ0 + winZ1) / 2], [wx + 1, winY, (winZ0 + winZ1) / 2]);
+            }
+
+            // 2 ventanas en pared alta Y=0 (parte del techo), centradas, ancho 1m
+            const hiWinY = y0, hiWinZ0 = 3.3, hiWinZ1 = 4.1;
+            const hiWinPositions = [3, 6];
+            for (const wx of hiWinPositions) {
+                edge([wx, hiWinY, hiWinZ0], [wx + 1, hiWinY, hiWinZ0]);
+                edge([wx + 1, hiWinY, hiWinZ0], [wx + 1, hiWinY, hiWinZ1]);
+                edge([wx + 1, hiWinY, hiWinZ1], [wx, hiWinY, hiWinZ1]);
+                edge([wx, hiWinY, hiWinZ1], [wx, hiWinY, hiWinZ0]);
+                // Cruz interior de la ventana
+                edge([wx + 0.5, hiWinY, hiWinZ0], [wx + 0.5, hiWinY, hiWinZ1]);
+                edge([wx, hiWinY, (hiWinZ0 + hiWinZ1) / 2], [wx + 1, hiWinY, (hiWinZ0 + hiWinZ1) / 2]);
+            }
+
+            // Extractor pequeño centrado entre las 2 ventanas (X=5, Y=0)
+            const exX = 4.75, exSize = 0.5, exZ = 3.45;
+            // Cuadrado del extractor
+            edge([exX, hiWinY, exZ], [exX + exSize, hiWinY, exZ]);
+            edge([exX + exSize, hiWinY, exZ], [exX + exSize, hiWinY, exZ + exSize]);
+            edge([exX + exSize, hiWinY, exZ + exSize], [exX, hiWinY, exZ + exSize]);
+            edge([exX, hiWinY, exZ + exSize], [exX, hiWinY, exZ]);
+            // Aspas (X diagonal)
+            edge([exX, hiWinY, exZ], [exX + exSize, hiWinY, exZ + exSize]);
+            edge([exX + exSize, hiWinY, exZ], [exX, hiWinY, exZ + exSize]);
+
+            // Jardinera en posición X=2, Y=6 (pared trasera)
+            const px_p0 = 1, px_p1 = 3;
+            const py_p0 = y1, py_p1 = y1 + 0.3;
             const pz1 = 0.7;                      // height
             // Bottom rectangle
             edge([px_p0,py_p0,z0],[px_p1,py_p0,z0]); edge([px_p1,py_p0,z0],[px_p1,py_p1,z0]);
@@ -716,17 +755,49 @@
                 sHover.push('<b>tex (ext)</b>: ' + texVal + '<br>Z: ' + tex.z.toFixed(1) + 'm');
             }
 
+            // Colores individuales por marcador: blanco para interiores, color de temperatura para tex
+            const markerColors = [];
+            for (const [label, info] of Object.entries(data.sensors)) {
+                markerColors.push('#ffffff');
+            }
+            if (data.tex_sensor && data.tex_sensor.value !== null) {
+                markerColors.push(tempColor(data.tex_sensor.value));
+            } else if (data.tex_sensor) {
+                markerColors.push('#ffffff');
+            }
+
             const markerTrace = {
                 type: 'scatter3d', mode: 'markers',
                 x: sx, y: sy, z: sz,
                 customdata: sHover,
                 marker: {
-                    size: 7, color: '#ffffff',
+                    size: 7, color: markerColors,
                     line: { color: '#000', width: 1.5 }, symbol: 'circle',
                 },
                 hovertemplate: '%{customdata}<extra></extra>',
                 showlegend: false,
             };
+
+            // Zona exterior: esfera de color según temperatura exterior
+            const extZoneTraces = [];
+            if (data.tex_sensor && data.tex_sensor.value !== null) {
+                const tex = data.tex_sensor;
+                const extColor = tempColor(tex.value);
+                // Plano coloreado en la zona de la jardinera (pared exterior)
+                const px0 = 1, px1 = 3, py = 6.15, pz0 = 0, pz1 = 0.7;
+                extZoneTraces.push({
+                    type: 'mesh3d',
+                    x: [px0, px1, px1, px0],
+                    y: [py, py, py, py],
+                    z: [pz0, pz0, pz1, pz1],
+                    i: [0, 0], j: [1, 2], k: [2, 3],
+                    color: extColor,
+                    opacity: 0.5,
+                    hovertemplate: '<b>Exterior</b>: ' + tex.value.toFixed(1) + ' °C<extra></extra>',
+                    showlegend: false,
+                    flatshading: true,
+                });
+            }
 
             // Sensor name labels (white, above marker)
             const nameTexts = [];
@@ -778,7 +849,7 @@
             // House wireframe
             const house = buildHouseStructure(data.x_range, data.y_range, data.z_range);
 
-            const traces = [...isoTraces, house, dropLines, markerTrace, nameTrace, valTrace];
+            const traces = [...isoTraces, house, ...extZoneTraces, dropLines, markerTrace, nameTrace, valTrace];
 
             const roofPeak = data.z_range[1] + 1.5;
             const layout = {
