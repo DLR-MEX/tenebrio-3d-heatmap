@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(taskkill //F //IM python.exe)",
+      "Bash(cd:*)",
+      "Bash(curl -s http://127.0.0.1:5000/)",
+      "Bash(curl -s http://127.0.0.1:5000/api/data)",
+      "Bash(curl:*)"
+    ]
+  }
+}

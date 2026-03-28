@@ -1,0 +1,1415 @@
+================================================================================
+TENEBRIOS — Real-Time 3D Volumetric Temperature Heatmap System
+Last updated: 2026-03-27
+================================================================================
+
+PROJECT DESCRIPTION
+-------------------
+TENEBRIOS is a real-time IoT temperature monitoring system that visualizes
+sensor data from a mealworm (tenebrio) breeding room as an interactive 3D
+volumetric heatmap. Five interior temperature sensors (t1-t5) are placed at
+known (x, y, z) coordinates inside the room. An exterior temperature sensor
+(tps) sits on top of a planter box on the left side wall (Y=0). Readings
+are collected via Ubidots MQTT, interpolated into a 3D volumetric field
+using scipy griddata (nearest + linear), and rendered as multiple Plotly.js
+isosurface slices that fill the entire room with color.
+
+The 3D scene includes:
+- Multiple isosurface slices (10 layers) filling the room with color.
+  Colors use a fixed scale: blue (<20°C cold), green (20-30°C ideal),
+  yellow/red (>30°C hot). cmin/cmax fixed to config VMIN=15 / VMAX=40.
+- Sensor markers (scatter3d) at their true 3D positions with drop lines.
+  Labels split into two traces: name in white, value in orange (#ffaa00).
+- A wireframe house (10x6x3m) with triangular roof, door on back wall
+  (X=0, Y=2.5..3.5), and a planter box on left side wall (Y=0,
+  X=5.5..7.5, height 0.7m).
+- The TPS sensor on top of the planter at (6.5, -0.15, 0.8).
+- 8 status cards: t1-t5 (blue), TPS (yellow), fan, extractor.
+- MQTT connection status indicator (green/yellow/red).
+
+Camera position is preserved across data refreshes. Fetch has 5s timeout.
+
+Temperature ideal range: 20-30°C.
+  Below 20°C = too cold (blue).
+  Above 30°C = too hot (red).
+
+
+================================================================================
+ARCHITECTURE AND TECHNOLOGY STACK
+================================================================================
+
+Language:   Python 3.10+
+Backend:    Flask (web server and JSON API)
+Frontend:   Single-page HTML with Plotly.js 2.35.2 (CDN)
+MQTT:       paho-mqtt v2.x (subscribe-only, Ubidots broker)
+Science:    NumPy, SciPy (griddata 3D interpolation)
+Testing:    pytest 7.0+
+Protocol:   Ubidots MQTT /lv (last-value) subscription model
+
+Files:
+  config.py            - All configuration constants
+  main.py              - Application entry point
+  mqtt_client.py       - MQTT connection, subscription, /lv payload parsing
+  heatmap_engine.py    - Temperature storage, validation, 3D interpolation
+  visualization.py     - Flask routes, JSON API, MQTT status injection
+  templates/index.html - 3D dashboard (isosurface + scatter3d + wireframe)
+  mqtt_simulator.py    - MQTT test data generator for local development
+  requirements.txt     - Python dependencies
+  install.sh           - Installation script
+  tests/test_interpolation.py - Unit tests for 3D volumetric engine
+  tests/test_mqtt_parser.py   - Unit tests for /lv message parsing
+  tests/__init__.py    - Package marker
+
+
+================================================================================
+CURRENT CONFIGURATION (config.py)
+================================================================================
+
+MQTT Broker:  industrial.api.ubidots.com:1883
+Device Label: tenebrios
+Token:        BBUS-6T17NCkbJ8pBVzOGwAhSnNijg2wBtu
+
+Sensor positions (x, y, z) in meters:
+  t1: (2, 3, 2.5)     — upper sensor, centered
+  t2: (5, 3, 2.5)     — upper sensor, centered
+  t3: (8, 3, 2.5)     — upper sensor, centered
+  t4: (3, 3, 1.0)     — lower sensor, centered
+  t5: (7, 3, 1.0)     — lower sensor, centered
+
+Exterior temperature sensor:
+  tps: (6.5, -0.15, 0.8) — on top of planter, left side wall (Y=0)
+
+Planter box (wireframe):
+  X: 5.5..7.5, Y: -0.3..0, Z: 0..0.7
+
+Room boundaries:
+  X: 0..10 m   (length)
+  Y: 0..6  m   (depth)
+  Z: 0..3  m   (height)
+
+3D Volumetric grid:
+  GRID_RES_X = 25, GRID_RES_Y = 18, GRID_RES_Z = 12
+  Total points: 5400
+
+Temperature settings:
+  HEATMAP_VMIN = 15.0, HEATMAP_VMAX = 40.0 (visualization range)
+  TEMP_VALID_MIN = -10.0, TEMP_VALID_MAX = 80.0 (physical validation)
+
+Refresh interval: 2000 ms
+
+
+================================================================================
+MQTT SUBSCRIPTION MODEL
+================================================================================
+
+Ubidots publishes each variable as a separate MQTT message:
+
+  Topic:   /v1.6/devices/tenebrios/{variable_label}/lv
+  Payload: plain numeric string, e.g. "25.4"
+
+The client subscribes to the wildcard topic:
+  /v1.6/devices/tenebrios/+/lv
+
+Connection uses paho-mqtt v2.x CallbackAPIVersion.VERSION2 with
+connect_async + loop_start. Auto-reconnection 1s..60s backoff.
+Connection status exposed via is_connected() for the UI indicator.
+
+
+================================================================================
+DATA FLOW
+================================================================================
+
+1. mqtt_client.py receives /lv messages via parse_lv_message(), produces
+   single-key dicts like {"t1": 25.4}, calls engine.update(data).
+
+2. heatmap_engine.py validates temperature range (-10..80°C), stores values.
+   On interpolate_volume():
+   - Needs >= 3 sensors (returns None otherwise).
+   - Uses scipy griddata in 3D (X, Y, Z) on a 25x18x12 grid.
+   - Nearest-neighbor fills entire volume, linear overlays convex hull.
+   - Clamps to [VMIN, VMAX]. Returns flattened 1D arrays.
+   - Meshgrid ordered x-fastest for Plotly compatibility.
+   - TPS NOT included in interpolation.
+
+3. visualization.py serves Flask app with MQTT status injection:
+   - GET /           -> renders templates/index.html
+   - GET /api/data   -> JSON with volume_data, sensors, tps_sensor,
+                         mqtt_connected, device states.
+
+4. templates/index.html polls /api/data every 2s (5s timeout) and renders:
+   - 10 isosurface slices filling room (cmin/cmax fixed to config range)
+   - Sensor markers + name labels (white) + value labels (orange)
+   - Drop lines, wireframe house, planter box, TPS marker
+   - 8 status cards + MQTT connection indicator
+
+
+================================================================================
+API RESPONSE FORMAT (/api/data)
+================================================================================
+
+{
+  "volume_data": {
+    "x": [float, ...],     // 5400-element 1D arrays (x-fastest order)
+    "y": [float, ...],
+    "z": [float, ...],
+    "value": [float, ...]
+  },
+  "x_range": [0, 10], "y_range": [0, 6], "z_range": [0, 3],
+  "vmin": 15.0, "vmax": 40.0,
+  "exterior_temp": 22.5 | null,
+  "fan_on": true | false,
+  "extractor_on": true | false,
+  "mqtt_connected": true | false,
+  "sensors": {
+    "t1": {"x": 2, "y": 3, "z": 2.5, "value": 28.3 | null}, ...
+  },
+  "tps_sensor": {"x": 6.5, "y": -0.15, "z": 0.8, "value": 32.4 | null}
+}
+
+
+================================================================================
+FRONTEND DETAILS (templates/index.html)
+================================================================================
+
+Colorscale (mapped to VMIN=15..VMAX=40):
+  15°C deep blue, 20°C cyan, 25°C green (ideal center),
+  30°C yellow, 35°C orange, 40°C dark red.
+
+Traces:
+  1. isoTraces (10) — isosurface slices, cmin/cmax from data.vmin/vmax,
+     opacity 0.35, caps enabled, 2 surfaces per slice.
+  2. house — wireframe: walls, pillars, roof, door (X=0), planter (Y=0).
+  3. dropLines — dashed vertical lines floor to sensor.
+  4. markerTrace — white dots at sensor positions.
+  5. nameTrace — sensor names in white (Z offset +0.25).
+  6. valTrace — temperature values in orange #ffaa00 (Z offset +0.05).
+
+Layout: dark theme, aspect {x:2, y:1.2, z:1}, camera preserved.
+Status: 3 states (green=ok, yellow=mqtt disconnected, red=server error).
+Fetch: AbortController with 5s timeout.
+
+
+================================================================================
+ROBUSTNESS
+================================================================================
+
+- Temperature validation: values outside -10..80°C rejected with warning.
+- MQTT auto-reconnects via paho (1s..60s backoff).
+- MQTT status exposed in API and displayed in UI.
+- Malformed payloads logged and discarded.
+- <3 sensors: volume_data=null, frontend skips rendering.
+- Fetch timeout: 5s via AbortController.
+- Camera read wrapped in try/catch (private Plotly API).
+- Flask: debug=False, use_reloader=False.
+- Thread safety: engine lock protects all shared state.
+
+
+================================================================================
+TESTING (18 tests)
+================================================================================
+
+pytest tests/ -v
+
+test_interpolation.py (7 tests):
+  - test_returns_none_with_insufficient_data
+  - test_returns_volume_with_three_sensors (dict with 5400 points)
+  - test_returns_valid_volume_with_all_sensors (no NaN)
+  - test_volume_values_within_clamp_range
+  - test_partial_update_preserves_previous
+  - test_rejects_impossible_temperature (>80°C rejected)
+  - test_rejects_negative_impossible_temperature (<-10°C rejected)
+
+test_mqtt_parser.py (11 tests):
+  - Tests for parse_lv_message: valid temps, integers, exterior,
+    unknown vars, malformed topics, non-numeric, empty, whitespace,
+    negative values, all known labels.
+
+
+================================================================================
+SOURCE CODE REFERENCE
+================================================================================
+
+Below are the complete source files for the project.
+
+
+--- FILE: config.py ---
+
+"""
+Configuration module for the real-time temperature heatmap system.
+"""
+
+### CONFIGURATION ###
+
+# MQTT / Ubidots settings
+MQTT_BROKER = "industrial.api.ubidots.com"
+MQTT_PORT = 1883
+UBIDOTS_TOKEN = "BBUS-6T17NCkbJ8pBVzOGwAhSnNijg2wBtu"
+DEVICE_LABEL = "tenebrios"
+
+# MQTT topic for subscribing to all device variables
+MQTT_TOPIC = f"/v1.6/devices/{DEVICE_LABEL}"
+
+# Sensor labels and their spatial coordinates (x, y, z) in the room
+SENSOR_POSITIONS = {
+    # Upper sensors (centered in Y=3)
+    "t1": (2, 3, 2.5),
+    "t2": (5, 3, 2.5),
+    "t3": (8, 3, 2.5),
+    # Interior sensors (center, lower height)
+    "t4": (3, 3, 1.0),
+    "t5": (7, 3, 1.0),
+}
+
+# Exterior temperature sensor position (on top of planter, left side wall Y=0)
+# Planter sits at X=5.5..7.5, Y=-0.3..0, Z=0..0.7
+TPS_POSITION = (6.5, -0.15, 0.8)
+
+# Room boundaries (meters)
+ROOM_X_MIN = 0
+ROOM_X_MAX = 10
+ROOM_Y_MIN = 0
+ROOM_Y_MAX = 6
+ROOM_Z_MIN = 0
+ROOM_Z_MAX = 3
+
+# Additional variable labels
+EXTERIOR_TEMP_LABEL = "tps"
+FAN_LABEL = "ventilador"
+EXTRACTOR_LABEL = "extractor"
+
+# 3D volumetric grid resolution (X, Y, Z points)
+GRID_RES_X = 25
+GRID_RES_Y = 18
+GRID_RES_Z = 12
+
+# Temperature range for visualization (ideal: 20-30 C)
+HEATMAP_VMIN = 15.0
+HEATMAP_VMAX = 40.0
+
+# Valid physical temperature range (reject readings outside this)
+TEMP_VALID_MIN = -10.0
+TEMP_VALID_MAX = 80.0
+
+# Web dashboard refresh interval in milliseconds
+ANIMATION_INTERVAL_MS = 2000
+
+# Flask web server settings
+WEB_HOST = "0.0.0.0"
+WEB_PORT = 5000
+
+
+--- FILE: main.py ---
+
+"""
+Entry point for the real-time room temperature heatmap application.
+
+Initializes the MQTT client (subscribe-only) and starts the Flask
+web server to display the heatmap dashboard.
+"""
+
+import logging
+
+from heatmap_engine import HeatmapEngine
+from mqtt_client import MqttClient
+import visualization
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
+def main():
+    engine = HeatmapEngine()
+    client = MqttClient(on_data=engine.update)
+
+    visualization.set_engine(engine)
+    visualization.set_mqtt_status(client.is_connected)
+
+    try:
+        client.start()
+        logger.info("MQTT client started (subscribe-only). Launching web server...")
+        visualization.start(host="0.0.0.0", port=5000)
+    except KeyboardInterrupt:
+        logger.info("Interrupted by user.")
+    finally:
+        client.stop()
+        logger.info("Application shut down.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+--- FILE: mqtt_client.py ---
+
+"""
+MQTT client module for Ubidots communication.
+
+Subscribes to /v1.6/devices/{device}/+/lv and forwards parsed readings
+to a callback. Ubidots /lv payloads are plain numeric strings, NOT JSON.
+"""
+
+import logging
+from typing import Callable, Optional
+
+import paho.mqtt.client as mqtt
+
+import config
+
+logger = logging.getLogger(__name__)
+
+# All variable labels we care about
+ALL_VARIABLES = (
+    list(config.SENSOR_POSITIONS.keys())
+    + [config.EXTERIOR_TEMP_LABEL, config.FAN_LABEL, config.EXTRACTOR_LABEL]
+)
+
+# Wildcard topic to receive all variables from the device
+SUBSCRIBE_TOPIC = f"/v1.6/devices/{config.DEVICE_LABEL}/+/lv"
+
+
+def parse_lv_message(topic: str, payload_raw: bytes) -> Optional[dict]:
+    """Parse a Ubidots /lv (last value) message.
+
+    Topic format: /v1.6/devices/{device}/{variable}/lv
+    Payload: plain numeric string like "25.4"
+
+    Returns a single-key dict like {"t1": 25.4} or None on error.
+    """
+    try:
+        parts = topic.strip("/").split("/")
+        # Expected: ["v1.6", "devices", "{device}", "{variable}", "lv"]
+        if len(parts) < 5 or parts[-1] != "lv":
+            return None
+        variable_label = parts[3]
+    except (IndexError, AttributeError):
+        return None
+
+    if variable_label not in ALL_VARIABLES:
+        logger.debug("Ignoring unknown variable: %s", variable_label)
+        return None
+
+    try:
+        value = float(payload_raw.decode("utf-8").strip())
+    except (ValueError, UnicodeDecodeError):
+        logger.warning("Cannot parse value for '%s': %r", variable_label, payload_raw)
+        return None
+
+    return {variable_label: value}
+
+
+class MqttClient:
+    """Manages the MQTT connection to Ubidots (subscribe-only)."""
+
+    def __init__(self, on_data: Callable[[dict], None]):
+        self._on_data = on_data
+        self._connected = False
+        self._client = mqtt.Client(
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+            client_id="",
+            protocol=mqtt.MQTTv311,
+        )
+        self._client.username_pw_set(config.UBIDOTS_TOKEN, "")
+        self._client.on_connect = self._on_connect
+        self._client.on_disconnect = self._on_disconnect
+        self._client.on_message = self._on_message
+        self._client.reconnect_delay_set(min_delay=1, max_delay=60)
+
+    # ------------------------------------------------------------------
+    # Callbacks
+    # ------------------------------------------------------------------
+
+    def _on_connect(self, client, userdata, flags, reason_code, properties=None):
+        if reason_code == 0:
+            self._connected = True
+            logger.info("Connected to MQTT broker at %s:%d",
+                        config.MQTT_BROKER, config.MQTT_PORT)
+            client.subscribe(SUBSCRIBE_TOPIC)
+            logger.info("Subscribed to: %s", SUBSCRIBE_TOPIC)
+        else:
+            self._connected = False
+            logger.error("Connection failed with reason code: %s", reason_code)
+
+    def _on_disconnect(self, client, userdata, flags, reason_code, properties=None):
+        self._connected = False
+        if reason_code != 0:
+            logger.warning(
+                "Unexpected disconnection (rc=%s). Paho will auto-reconnect.",
+                reason_code,
+            )
+        else:
+            logger.info("Disconnected cleanly from broker.")
+
+    def _on_message(self, client, userdata, msg):
+        data = parse_lv_message(msg.topic, msg.payload)
+        if data:
+            logger.info("Received: %s", data)
+            self._on_data(data)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def is_connected(self) -> bool:
+        """Return True if currently connected to the MQTT broker."""
+        return self._connected
+
+    def start(self):
+        """Connect and start the background network loop."""
+        logger.info("Connecting to %s:%d ...", config.MQTT_BROKER, config.MQTT_PORT)
+        self._client.connect_async(config.MQTT_BROKER, config.MQTT_PORT, keepalive=60)
+        self._client.loop_start()
+
+    def stop(self):
+        """Disconnect and stop the loop."""
+        self._client.loop_stop()
+        self._client.disconnect()
+        logger.info("MQTT client stopped.")
+
+
+--- FILE: heatmap_engine.py ---
+
+"""
+Heatmap interpolation engine (3D volumetric).
+
+Stores the latest sensor temperatures and produces an interpolated 3-D
+temperature volume using scipy.interpolate.griddata.
+"""
+
+import logging
+import threading
+from typing import Optional
+
+import numpy as np
+from scipy.interpolate import griddata
+
+import config
+
+logger = logging.getLogger(__name__)
+
+
+def _is_valid_temperature(value: float) -> bool:
+    """Return True if the value is within the physically plausible range."""
+    return config.TEMP_VALID_MIN <= value <= config.TEMP_VALID_MAX
+
+
+class HeatmapEngine:
+    """Thread-safe temperature store with 3-D volumetric interpolation."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+
+        self._temperatures: dict[str, float] = {}
+        self._exterior_temp: Optional[float] = None
+        self._fan_state: bool = False
+        self._extractor_state: bool = False
+
+        self._sensor_labels = list(config.SENSOR_POSITIONS.keys())
+        self._sensor_coords = np.array(
+            [config.SENSOR_POSITIONS[s] for s in self._sensor_labels]
+        )
+
+        # Pre-compute the 3D meshgrid flattened for Plotly volume trace.
+        # Plotly expects flat_index = ix + nx*(iy + ny*iz), i.e. x-fastest.
+        # meshgrid(gz, gy, gx, indexing="ij") -> shape (nz, ny, nx),
+        # so ravel() in C order gives z-slowest / x-fastest = what Plotly needs.
+        gx = np.linspace(config.ROOM_X_MIN, config.ROOM_X_MAX, config.GRID_RES_X)
+        gy = np.linspace(config.ROOM_Y_MIN, config.ROOM_Y_MAX, config.GRID_RES_Y)
+        gz = np.linspace(config.ROOM_Z_MIN, config.ROOM_Z_MAX, config.GRID_RES_Z)
+        mz, my, mx = np.meshgrid(gz, gy, gx, indexing="ij")
+        self._grid_x = mx.ravel()
+        self._grid_y = my.ravel()
+        self._grid_z = mz.ravel()
+        self._grid_points = np.column_stack([self._grid_x, self._grid_y, self._grid_z])
+
+    # ------------------------------------------------------------------
+    # Data ingestion
+    # ------------------------------------------------------------------
+
+    def update(self, data: dict) -> None:
+        """Merge incoming sensor data into the internal store.
+
+        Values outside the physically valid range are silently discarded.
+        """
+        with self._lock:
+            for label in self._sensor_labels:
+                if label in data:
+                    value = data[label]
+                    if _is_valid_temperature(value):
+                        self._temperatures[label] = value
+                    else:
+                        logger.warning("Rejected %s=%.1f: outside valid range", label, value)
+
+            if config.EXTERIOR_TEMP_LABEL in data:
+                value = data[config.EXTERIOR_TEMP_LABEL]
+                if _is_valid_temperature(value):
+                    self._exterior_temp = value
+                else:
+                    logger.warning("Rejected tps=%.1f: outside valid range", value)
+
+            if config.FAN_LABEL in data:
+                self._fan_state = data[config.FAN_LABEL] >= 1.0
+            if config.EXTRACTOR_LABEL in data:
+                self._extractor_state = data[config.EXTRACTOR_LABEL] >= 1.0
+
+    # ------------------------------------------------------------------
+    # 3D Interpolation
+    # ------------------------------------------------------------------
+
+    def interpolate_volume(self) -> Optional[dict]:
+        """Return flattened 3D volume arrays for Plotly, or None if insufficient data.
+
+        Returns dict with keys: x, y, z, value (all 1D lists).
+        """
+        with self._lock:
+            values = []
+            coords = []
+            for i, label in enumerate(self._sensor_labels):
+                if label in self._temperatures:
+                    values.append(self._temperatures[label])
+                    coords.append(self._sensor_coords[i])
+
+        if len(values) < 3:
+            return None
+
+        coords_arr = np.array(coords)
+        values_arr = np.array(values)
+
+        # Nearest-neighbor always succeeds and fills the entire volume
+        volume = griddata(
+            coords_arr, values_arr, self._grid_points, method="nearest"
+        )
+
+        # Try linear for better quality inside convex hull, keep nearest outside
+        try:
+            linear = griddata(
+                coords_arr, values_arr, self._grid_points, method="linear"
+            )
+            valid = ~np.isnan(linear)
+            volume[valid] = linear[valid]
+        except Exception:
+            pass
+
+        np.clip(volume, config.HEATMAP_VMIN, config.HEATMAP_VMAX, out=volume)
+
+        return {
+            "x": self._grid_x.tolist(),
+            "y": self._grid_y.tolist(),
+            "z": self._grid_z.tolist(),
+            "value": volume.tolist(),
+        }
+
+    # ------------------------------------------------------------------
+    # Accessors
+    # ------------------------------------------------------------------
+
+    def get_sensor_value(self, label: str) -> Optional[float]:
+        with self._lock:
+            return self._temperatures.get(label)
+
+    def get_exterior_temp(self) -> Optional[float]:
+        with self._lock:
+            return self._exterior_temp
+
+    def get_fan_state(self) -> bool:
+        with self._lock:
+            return self._fan_state
+
+    def get_extractor_state(self) -> bool:
+        with self._lock:
+            return self._extractor_state
+
+
+--- FILE: visualization.py ---
+
+"""
+Flask web server for real-time 3D volumetric heatmap visualization.
+
+Serves an HTML page with a Plotly.js volume trace that auto-refreshes
+by polling a JSON API endpoint.
+"""
+
+import logging
+import os
+from typing import Callable
+
+from flask import Flask, jsonify, render_template
+
+import config
+from heatmap_engine import HeatmapEngine
+
+logger = logging.getLogger(__name__)
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(os.path.dirname(__file__), "templates"),
+)
+
+_engine: HeatmapEngine = None
+_mqtt_status: Callable[[], bool] = lambda: False
+
+
+def set_engine(engine: HeatmapEngine):
+    """Inject the shared HeatmapEngine instance."""
+    global _engine
+    _engine = engine
+
+
+def set_mqtt_status(status_fn: Callable[[], bool]):
+    """Inject a callable that returns MQTT connection status."""
+    global _mqtt_status
+    _mqtt_status = status_fn
+
+
+@app.route("/")
+def index():
+    return render_template("index.html", refresh_ms=config.ANIMATION_INTERVAL_MS)
+
+
+@app.route("/api/data")
+def api_data():
+    if _engine is None:
+        return jsonify({"error": "Engine not initialized"}), 503
+
+    volume = _engine.interpolate_volume()
+
+    sensor_values = {}
+    for label in config.SENSOR_POSITIONS:
+        val = _engine.get_sensor_value(label)
+        if val is not None:
+            sensor_values[label] = round(val, 1)
+
+    ext_temp = _engine.get_exterior_temp()
+    tps_sensor = {
+        "x": config.TPS_POSITION[0],
+        "y": config.TPS_POSITION[1],
+        "z": config.TPS_POSITION[2],
+        "value": round(ext_temp, 1) if ext_temp is not None else None,
+    }
+
+    return jsonify({
+        "volume_data": volume,
+        "x_range": [config.ROOM_X_MIN, config.ROOM_X_MAX],
+        "y_range": [config.ROOM_Y_MIN, config.ROOM_Y_MAX],
+        "z_range": [config.ROOM_Z_MIN, config.ROOM_Z_MAX],
+        "vmin": config.HEATMAP_VMIN,
+        "vmax": config.HEATMAP_VMAX,
+        "exterior_temp": ext_temp,
+        "fan_on": _engine.get_fan_state(),
+        "extractor_on": _engine.get_extractor_state(),
+        "mqtt_connected": _mqtt_status(),
+        "sensors": {
+            label: {
+                "x": pos[0], "y": pos[1], "z": pos[2],
+                "value": sensor_values.get(label),
+            }
+            for label, pos in config.SENSOR_POSITIONS.items()
+        },
+        "tps_sensor": tps_sensor,
+    })
+
+
+def start(host="0.0.0.0", port=5000):
+    logger.info("Starting web server on http://%s:%d", host, port)
+    app.run(host=host, port=port, debug=False, use_reloader=False)
+
+
+--- FILE: templates/index.html ---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Temperature Heatmap 3D</title>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e; color: #eee; min-height: 100vh;
+        }
+        .header {
+            background: #16213e; padding: 16px 24px; text-align: center;
+            border-bottom: 2px solid #0f3460;
+        }
+        .header h1 { font-size: 1.5rem; color: #e94560; }
+        .header p { font-size: 0.85rem; color: #888; margin-top: 4px; }
+        .dashboard { max-width: 1300px; margin: 20px auto; padding: 0 16px; }
+
+        .status-bar {
+            display: flex; gap: 12px; justify-content: center;
+            flex-wrap: wrap; margin-bottom: 16px;
+        }
+        .status-card {
+            background: #16213e; border-radius: 10px; padding: 12px 20px;
+            text-align: center; min-width: 130px; border: 1px solid #0f3460;
+        }
+        .status-card .label {
+            font-size: 0.7rem; color: #888; text-transform: uppercase;
+            letter-spacing: 1px; margin-bottom: 4px;
+        }
+        .status-card .value { font-size: 1.5rem; font-weight: bold; }
+        .status-card .value.temp { color: #f0a500; }
+        .status-card .value.sensor { color: #00bfff; }
+        .status-card .value.on { color: #4ecca3; }
+        .status-card .value.off { color: #e94560; }
+        .status-card .value.waiting { color: #555; }
+
+        #scene-container {
+            background: #16213e; border-radius: 10px; padding: 16px;
+            border: 1px solid #0f3460;
+        }
+        #scene3d { width: 100%; height: 650px; }
+        .footer { text-align: center; padding: 12px; color: #555; font-size: 0.75rem; }
+        .connection-dot {
+            display: inline-block; width: 10px; height: 10px;
+            border-radius: 50%; margin-right: 6px; vertical-align: middle;
+        }
+        .connection-dot.ok { background: #4ecca3; }
+        .connection-dot.err { background: #e94560; }
+        .connection-dot.warn { background: #f0a500; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Room Temperature Heatmap — 3D Volumetric View</h1>
+        <p><span id="conn-dot" class="connection-dot err"></span>
+           <span id="conn-status">Connecting...</span></p>
+    </div>
+
+    <div class="dashboard">
+        <!-- Sensor cards row -->
+        <div class="status-bar">
+            <div class="status-card">
+                <div class="label">T1 (2,3,2.5)</div>
+                <div class="value sensor" id="val-t1">-- &deg;C</div>
+            </div>
+            <div class="status-card">
+                <div class="label">T2 (5,3,2.5)</div>
+                <div class="value sensor" id="val-t2">-- &deg;C</div>
+            </div>
+            <div class="status-card">
+                <div class="label">T3 (8,3,2.5)</div>
+                <div class="value sensor" id="val-t3">-- &deg;C</div>
+            </div>
+            <div class="status-card">
+                <div class="label">T4 (3,3,1)</div>
+                <div class="value sensor" id="val-t4">-- &deg;C</div>
+            </div>
+            <div class="status-card">
+                <div class="label">T5 (7,3,1)</div>
+                <div class="value sensor" id="val-t5">-- &deg;C</div>
+            </div>
+        </div>
+        <!-- Status cards row -->
+        <div class="status-bar">
+            <div class="status-card">
+                <div class="label">Exterior (TPS)</div>
+                <div class="value temp" id="ext-temp">-- &deg;C</div>
+            </div>
+            <div class="status-card">
+                <div class="label">Fan (Ventilador)</div>
+                <div class="value waiting" id="fan-status">--</div>
+            </div>
+            <div class="status-card">
+                <div class="label">Extractor</div>
+                <div class="value waiting" id="ext-status">--</div>
+            </div>
+        </div>
+
+        <div id="scene-container">
+            <div id="scene3d"></div>
+        </div>
+    </div>
+
+    <div class="footer">TENEBRIOS &mdash; Real-time IoT 3D Volumetric Temperature Monitor</div>
+
+    <script>
+        const REFRESH_MS = {{ refresh_ms }};
+        const FETCH_TIMEOUT_MS = 5000;
+        let plotInitialized = false;
+
+        // Colorscale: blue (cold <20) -> green (ideal 20-30) -> red (hot >30)
+        // Mapped to VMIN=15..VMAX=40: 20C=0.2, 25C=0.4, 30C=0.6
+        const TEMP_COLORSCALE = [
+            [0,    'rgb(0,0,200)'],      // 15 C — deep blue (very cold)
+            [0.1,  'rgb(0,80,255)'],     // 17.5 C — blue
+            [0.2,  'rgb(0,180,220)'],    // 20 C — cyan (cold limit)
+            [0.3,  'rgb(0,210,140)'],    // 22.5 C — teal-green
+            [0.4,  'rgb(0,200,0)'],      // 25 C — green (ideal center)
+            [0.5,  'rgb(140,220,0)'],    // 27.5 C — yellow-green
+            [0.6,  'rgb(255,220,0)'],    // 30 C — yellow (hot limit)
+            [0.75, 'rgb(255,140,0)'],    // 33.75 C — orange
+            [0.9,  'rgb(220,40,0)'],     // 37.5 C — red
+            [1,    'rgb(160,0,0)'],      // 40 C — dark red (very hot)
+        ];
+
+        // ---------------------------------------------------------------
+        // House wireframe: walls + door on back wall (X=0) + roof + planter
+        // ---------------------------------------------------------------
+        function buildHouseStructure(xr, yr, zr) {
+            const [x0, x1] = xr;
+            const [y0, y1] = yr;
+            const [z0, z1] = zr;
+            const yMid = (y0 + y1) / 2;
+            const roofPeak = z1 + 1.5;
+
+            const doorZ1 = 2.0;
+
+            const segments = [];
+            function edge(a, b) { segments.push(a, b, null); }
+
+            // Floor
+            edge([x0,y0,z0],[x1,y0,z0]); edge([x1,y0,z0],[x1,y1,z0]);
+            edge([x1,y1,z0],[x0,y1,z0]); edge([x0,y1,z0],[x0,y0,z0]);
+            // Ceiling
+            edge([x0,y0,z1],[x1,y0,z1]); edge([x1,y0,z1],[x1,y1,z1]);
+            edge([x1,y1,z1],[x0,y1,z1]); edge([x0,y1,z1],[x0,y0,z1]);
+            // Pillars
+            edge([x0,y0,z0],[x0,y0,z1]); edge([x1,y0,z0],[x1,y0,z1]);
+            edge([x1,y1,z0],[x1,y1,z1]); edge([x0,y1,z0],[x0,y1,z1]);
+            // Roof
+            edge([x1,y0,z1],[x1,yMid,roofPeak]); edge([x1,y1,z1],[x1,yMid,roofPeak]);
+            edge([x0,y0,z1],[x0,yMid,roofPeak]); edge([x0,y1,z1],[x0,yMid,roofPeak]);
+            edge([x0,yMid,roofPeak],[x1,yMid,roofPeak]);
+            // Door on back wall (X=0)
+            const doorY0 = 2.5, doorY1 = 3.5;
+            edge([x0,doorY0,z0],[x0,doorY0,doorZ1]);
+            edge([x0,doorY0,doorZ1],[x0,doorY1,doorZ1]);
+            edge([x0,doorY1,doorZ1],[x0,doorY1,z0]);
+
+            // Planter box on left side wall (Y=0), ~3/4 along X
+            const py_p0 = y0 - 0.3, py_p1 = y0;
+            const px_p0 = 5.5, px_p1 = 7.5;
+            const pz1 = 0.7;
+            // Bottom rectangle
+            edge([px_p0,py_p0,z0],[px_p1,py_p0,z0]); edge([px_p1,py_p0,z0],[px_p1,py_p1,z0]);
+            edge([px_p1,py_p1,z0],[px_p0,py_p1,z0]); edge([px_p0,py_p1,z0],[px_p0,py_p0,z0]);
+            // Top rectangle
+            edge([px_p0,py_p0,pz1],[px_p1,py_p0,pz1]); edge([px_p1,py_p0,pz1],[px_p1,py_p1,pz1]);
+            edge([px_p1,py_p1,pz1],[px_p0,py_p1,pz1]); edge([px_p0,py_p1,pz1],[px_p0,py_p0,pz1]);
+            // Vertical edges
+            edge([px_p0,py_p0,z0],[px_p0,py_p0,pz1]); edge([px_p1,py_p0,z0],[px_p1,py_p0,pz1]);
+            edge([px_p1,py_p1,z0],[px_p1,py_p1,pz1]); edge([px_p0,py_p1,z0],[px_p0,py_p1,pz1]);
+
+            const rx = [], ry = [], rz = [];
+            for (const p of segments) {
+                if (p === null) { rx.push(null); ry.push(null); rz.push(null); }
+                else { rx.push(p[0]); ry.push(p[1]); rz.push(p[2]); }
+            }
+            return {
+                type: 'scatter3d', mode: 'lines',
+                x: rx, y: ry, z: rz,
+                line: { color: 'rgba(255,255,255,0.5)', width: 3 },
+                hoverinfo: 'skip', showlegend: false,
+            };
+        }
+
+        // ---------------------------------------------------------------
+        // Connection & MQTT status indicator
+        // ---------------------------------------------------------------
+        function updateConnectionStatus(httpOk, mqttConnected) {
+            const dot = document.getElementById('conn-dot');
+            const label = document.getElementById('conn-status');
+
+            if (!httpOk) {
+                dot.className = 'connection-dot err';
+                label.textContent = 'Server unreachable';
+            } else if (!mqttConnected) {
+                dot.className = 'connection-dot warn';
+                label.textContent = 'MQTT disconnected — reconnecting...';
+            } else {
+                dot.className = 'connection-dot ok';
+                label.textContent = 'Receiving data';
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Dashboard status cards
+        // ---------------------------------------------------------------
+        function updateDashboard(data) {
+            updateConnectionStatus(true, data.mqtt_connected);
+
+            // Individual sensor cards
+            for (const [label, info] of Object.entries(data.sensors)) {
+                const el = document.getElementById('val-' + label);
+                if (el) {
+                    el.innerHTML = info.value !== null
+                        ? info.value.toFixed(1) + ' &deg;C' : '-- &deg;C';
+                }
+            }
+
+            // Exterior temp
+            const extEl = document.getElementById('ext-temp');
+            extEl.innerHTML = data.exterior_temp !== null
+                ? data.exterior_temp.toFixed(1) + ' &deg;C' : '-- &deg;C';
+
+            // Fan / Extractor
+            const fanEl = document.getElementById('fan-status');
+            fanEl.textContent = data.fan_on ? 'ON' : 'OFF';
+            fanEl.className = 'value ' + (data.fan_on ? 'on' : 'off');
+
+            const extSt = document.getElementById('ext-status');
+            extSt.textContent = data.extractor_on ? 'ON' : 'OFF';
+            extSt.className = 'value ' + (data.extractor_on ? 'on' : 'off');
+        }
+
+        // ---------------------------------------------------------------
+        // Safe camera read (Plotly private API, wrapped in try/catch)
+        // ---------------------------------------------------------------
+        function getCurrentCamera() {
+            try {
+                const el = document.getElementById('scene3d');
+                if (el._fullLayout && el._fullLayout.scene && el._fullLayout.scene._scene) {
+                    return el._fullLayout.scene._scene.getCamera();
+                }
+            } catch (e) {
+                // Private API may change across Plotly versions
+            }
+            return null;
+        }
+
+        // ---------------------------------------------------------------
+        // 3D scene builder
+        // ---------------------------------------------------------------
+        function buildScene(data) {
+            if (!data.volume_data) return;
+
+            const vol = data.volume_data;
+
+            // Compute actual data range
+            let volMin = Infinity, volMax = -Infinity;
+            for (let i = 0; i < vol.value.length; i++) {
+                if (vol.value[i] < volMin) volMin = vol.value[i];
+                if (vol.value[i] > volMax) volMax = vol.value[i];
+            }
+
+            // Multiple isosurface slices to fill the entire room with color
+            // Use fixed range from config (data.vmin / data.vmax) for consistent colors
+            const nSlices = 10;
+            const step = (volMax - volMin) / nSlices;
+            const isoTraces = [];
+            for (let s = 0; s < nSlices; s++) {
+                const lo = volMin + s * step;
+                const hi = lo + step;
+                isoTraces.push({
+                    type: 'isosurface',
+                    x: vol.x, y: vol.y, z: vol.z,
+                    value: vol.value,
+                    isomin: lo,
+                    isomax: hi,
+                    surface: { show: true, count: 2 },
+                    caps: { x: {show: true}, y: {show: true}, z: {show: true} },
+                    colorscale: TEMP_COLORSCALE,
+                    cmin: data.vmin,
+                    cmax: data.vmax,
+                    opacity: 0.35,
+                    showscale: s === 0,
+                    colorbar: s === 0 ? {
+                        title: { text: '°C', font: { color: '#ccc', size: 14 } },
+                        tickfont: { color: '#ccc', size: 11 },
+                        len: 0.6, thickness: 18,
+                    } : undefined,
+                    hovertemplate: 'X: %{x:.1f}m<br>Y: %{y:.1f}m<br>Z: %{z:.1f}m<br>Temp: %{value:.1f} °C<extra></extra>',
+                });
+            }
+
+            // Sensor markers (white dots)
+            const sx = [], sy = [], sz = [], sHover = [];
+            for (const [label, info] of Object.entries(data.sensors)) {
+                sx.push(info.x); sy.push(info.y); sz.push(info.z);
+                const val = info.value !== null ? info.value.toFixed(1) + ' °C' : '--';
+                sHover.push('<b>' + label + '</b>: ' + val + '<br>Z: ' + info.z.toFixed(1) + 'm');
+            }
+            if (data.tps_sensor) {
+                const tps = data.tps_sensor;
+                sx.push(tps.x); sy.push(tps.y); sz.push(tps.z);
+                const tpsVal = tps.value !== null ? tps.value.toFixed(1) + ' °C' : '--';
+                sHover.push('<b>tps (ext)</b>: ' + tpsVal + '<br>Z: ' + tps.z.toFixed(1) + 'm');
+            }
+
+            const markerTrace = {
+                type: 'scatter3d', mode: 'markers',
+                x: sx, y: sy, z: sz,
+                customdata: sHover,
+                marker: {
+                    size: 7, color: '#ffffff',
+                    line: { color: '#000', width: 1.5 }, symbol: 'circle',
+                },
+                hovertemplate: '%{customdata}<extra></extra>',
+                showlegend: false,
+            };
+
+            // Sensor name labels (white, above marker)
+            const nameTexts = [];
+            for (const label of Object.keys(data.sensors)) nameTexts.push(label);
+            if (data.tps_sensor) nameTexts.push('tps');
+
+            const nameTrace = {
+                type: 'scatter3d', mode: 'text',
+                x: sx.map((v, i) => v), y: sy, z: sz.map(v => v + 0.25),
+                text: nameTexts,
+                textposition: 'top center',
+                textfont: { color: '#ffffff', size: 11, family: 'monospace' },
+                hoverinfo: 'skip', showlegend: false,
+            };
+
+            // Sensor value labels (orange, below name)
+            const valTexts = [];
+            for (const info of Object.values(data.sensors)) {
+                valTexts.push(info.value !== null ? info.value.toFixed(1) + ' °C' : '--');
+            }
+            if (data.tps_sensor) {
+                const tv = data.tps_sensor.value;
+                valTexts.push(tv !== null ? tv.toFixed(1) + ' °C' : '--');
+            }
+
+            const valTrace = {
+                type: 'scatter3d', mode: 'text',
+                x: sx, y: sy, z: sz.map(v => v + 0.05),
+                text: valTexts,
+                textposition: 'top center',
+                textfont: { color: '#ffaa00', size: 11, family: 'monospace' },
+                hoverinfo: 'skip', showlegend: false,
+            };
+
+            // Drop lines
+            const dlx = [], dly = [], dlz = [];
+            for (let i = 0; i < sx.length; i++) {
+                dlx.push(sx[i], sx[i], null);
+                dly.push(sy[i], sy[i], null);
+                dlz.push(0, sz[i], null);
+            }
+            const dropLines = {
+                type: 'scatter3d', mode: 'lines',
+                x: dlx, y: dly, z: dlz,
+                line: { color: 'rgba(255,255,255,0.25)', width: 2, dash: 'dot' },
+                hoverinfo: 'skip', showlegend: false,
+            };
+
+            // House wireframe
+            const house = buildHouseStructure(data.x_range, data.y_range, data.z_range);
+
+            const traces = [...isoTraces, house, dropLines, markerTrace, nameTrace, valTrace];
+
+            const roofPeak = data.z_range[1] + 1.5;
+            const layout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: '#ccc' },
+                margin: { t: 10, r: 10, b: 10, l: 10 },
+                showlegend: false,
+                scene: {
+                    xaxis: {
+                        title: 'X (m)', range: [data.x_range[0] - 0.5, data.x_range[1] + 0.5],
+                        color: '#888', gridcolor: '#333', backgroundcolor: '#0d1117',
+                    },
+                    yaxis: {
+                        title: 'Y (m)', range: [data.y_range[0] - 1, data.y_range[1] + 0.5],
+                        color: '#888', gridcolor: '#333', backgroundcolor: '#0d1117',
+                    },
+                    zaxis: {
+                        title: 'Z (m)', range: [0, roofPeak + 0.3],
+                        color: '#888', gridcolor: '#333', backgroundcolor: '#0d1117',
+                    },
+                    aspectratio: { x: 2, y: 1.2, z: 1 },
+                    camera: {
+                        eye: { x: 1.6, y: -1.8, z: 1.0 },
+                        up: { x: 0, y: 0, z: 1 },
+                    },
+                    bgcolor: '#0d1117',
+                },
+            };
+
+            const plotConfig = { responsive: true, displayModeBar: false };
+
+            if (!plotInitialized) {
+                Plotly.newPlot('scene3d', traces, layout, plotConfig);
+                plotInitialized = true;
+            } else {
+                const cam = getCurrentCamera();
+                if (cam) layout.scene.camera = cam;
+                Plotly.react('scene3d', traces, layout, plotConfig);
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Data polling with timeout
+        // ---------------------------------------------------------------
+        async function fetchData() {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+            try {
+                const resp = await fetch('/api/data', { signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (!resp.ok) throw new Error('API error');
+                const data = await resp.json();
+                updateDashboard(data);
+                buildScene(data);
+            } catch (err) {
+                clearTimeout(timeoutId);
+                updateConnectionStatus(false, false);
+            }
+        }
+
+        fetchData();
+        setInterval(fetchData, REFRESH_MS);
+    </script>
+</body>
+</html>
+
+
+--- FILE: mqtt_simulator.py ---
+
+"""
+MQTT simulator for local testing.
+
+Publishes randomized sensor data every 2 seconds to the same topic
+that the real application subscribes to, using a local MQTT broker
+(e.g., Mosquitto on localhost).
+
+Usage:
+    python mqtt_simulator.py [--broker BROKER] [--port PORT]
+"""
+
+import argparse
+import json
+import random
+import time
+import logging
+
+import paho.mqtt.client as mqtt
+
+import config
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# Temperature ranges for simulation
+TEMP_BASE = 25.0
+TEMP_VARIATION = 3.0
+EXT_TEMP_BASE = 32.0
+EXT_TEMP_VARIATION = 2.0
+
+
+def generate_payload() -> dict:
+    """Generate a randomized sensor payload."""
+    return {
+        "t1": round(TEMP_BASE + random.uniform(-TEMP_VARIATION, TEMP_VARIATION), 1),
+        "t2": round(TEMP_BASE + random.uniform(-TEMP_VARIATION, TEMP_VARIATION), 1),
+        "t3": round(TEMP_BASE + random.uniform(-TEMP_VARIATION, TEMP_VARIATION), 1),
+        "t4": round(TEMP_BASE + random.uniform(-TEMP_VARIATION, TEMP_VARIATION), 1),
+        "t5": round(TEMP_BASE + random.uniform(-TEMP_VARIATION, TEMP_VARIATION), 1),
+        "t_ext": round(EXT_TEMP_BASE + random.uniform(-EXT_TEMP_VARIATION, EXT_TEMP_VARIATION), 1),
+        "ventilador": random.choice([0, 1]),
+        "extractor": random.choice([0, 1]),
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser(description="MQTT temperature data simulator")
+    parser.add_argument("--broker", default=config.MQTT_BROKER, help="MQTT broker address")
+    parser.add_argument("--port", type=int, default=config.MQTT_PORT, help="MQTT broker port")
+    args = parser.parse_args()
+
+    client = mqtt.Client(
+        callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+        client_id="simulator",
+    )
+
+    # Authenticate with Ubidots (username = token, no password)
+    client.username_pw_set(config.UBIDOTS_TOKEN, "")
+
+    topic = config.MQTT_TOPIC
+    logger.info("Connecting to %s:%d ...", args.broker, args.port)
+    client.connect(args.broker, args.port, keepalive=60)
+    client.loop_start()
+
+    logger.info("Publishing to topic: %s  (Ctrl+C to stop)", topic)
+
+    try:
+        while True:
+            payload = generate_payload()
+            message = json.dumps(payload)
+            client.publish(topic, message)
+            logger.info("Published: %s", message)
+            time.sleep(2)
+    except KeyboardInterrupt:
+        logger.info("Simulator stopped.")
+    finally:
+        client.loop_stop()
+        client.disconnect()
+
+
+if __name__ == "__main__":
+    main()
+
+
+--- FILE: tests/test_interpolation.py ---
+
+"""
+Tests for the 3D volumetric heatmap interpolation engine.
+"""
+
+import numpy as np
+import pytest
+
+from heatmap_engine import HeatmapEngine
+
+
+@pytest.fixture
+def engine():
+    return HeatmapEngine()
+
+
+def _full_sensor_data():
+    """Return a complete set of sensor readings."""
+    return {
+        "t1": 24.0,
+        "t2": 26.0,
+        "t3": 25.0,
+        "t4": 27.0,
+        "t5": 23.0,
+    }
+
+
+class TestInterpolateVolume:
+    def test_returns_none_with_insufficient_data(self, engine):
+        """Interpolation requires at least 3 sensors; fewer should return None."""
+        engine.update({"t1": 25.0})
+        assert engine.interpolate_volume() is None
+
+        engine.update({"t2": 26.0})
+        assert engine.interpolate_volume() is None
+
+    def test_returns_volume_with_three_sensors(self, engine):
+        """With exactly 3 sensors, interpolation should produce valid arrays."""
+        engine.update({"t1": 24.0, "t2": 26.0, "t3": 25.0})
+        result = engine.interpolate_volume()
+
+        assert result is not None
+        assert set(result.keys()) == {"x", "y", "z", "value"}
+        # 25 * 18 * 12 = 5400 points
+        assert len(result["x"]) == 5400
+        assert len(result["value"]) == 5400
+
+    def test_returns_valid_volume_with_all_sensors(self, engine):
+        """Full sensor data should produce a complete volume with no NaN."""
+        engine.update(_full_sensor_data())
+        result = engine.interpolate_volume()
+
+        assert result is not None
+        values = np.array(result["value"])
+        assert not np.isnan(values).any(), "Volume should contain no NaN values"
+
+    def test_volume_values_within_clamp_range(self, engine):
+        """Interpolated values should be clamped to [VMIN, VMAX]."""
+        engine.update(_full_sensor_data())
+        result = engine.interpolate_volume()
+        values = np.array(result["value"])
+
+        from config import HEATMAP_VMIN, HEATMAP_VMAX
+        assert values.min() >= HEATMAP_VMIN
+        assert values.max() <= HEATMAP_VMAX
+
+    def test_partial_update_preserves_previous(self, engine):
+        """Updating only some sensors should retain previously stored values."""
+        engine.update(_full_sensor_data())
+        engine.update({"t1": 30.0})
+
+        result = engine.interpolate_volume()
+        assert result is not None
+        values = np.array(result["value"])
+        assert not np.isnan(values).any()
+
+    def test_rejects_impossible_temperature(self, engine):
+        """Values outside the physically valid range should be discarded."""
+        engine.update({"t1": 24.0, "t2": 26.0, "t3": 25.0})
+        # This should be rejected (>80 C)
+        engine.update({"t1": 200.0})
+
+        # t1 should still be 24.0, not 200.0
+        assert engine.get_sensor_value("t1") == 24.0
+
+    def test_rejects_negative_impossible_temperature(self, engine):
+        """Extremely low values should be discarded."""
+        engine.update({"t1": 24.0, "t2": 26.0, "t3": 25.0})
+        engine.update({"t2": -50.0})
+
+        assert engine.get_sensor_value("t2") == 26.0
+
+
+--- FILE: tests/test_mqtt_parser.py ---
+
+"""
+Tests for MQTT /lv message parsing.
+"""
+
+import pytest
+
+from mqtt_client import parse_lv_message
+
+
+class TestParseLvMessage:
+    def test_valid_temperature_message(self):
+        topic = "/v1.6/devices/tenebrios/t1/lv"
+        result = parse_lv_message(topic, b"25.4")
+        assert result == {"t1": 25.4}
+
+    def test_valid_integer_payload(self):
+        topic = "/v1.6/devices/tenebrios/ventilador/lv"
+        result = parse_lv_message(topic, b"1")
+        assert result == {"ventilador": 1.0}
+
+    def test_valid_exterior_sensor(self):
+        topic = "/v1.6/devices/tenebrios/tps/lv"
+        result = parse_lv_message(topic, b"32.1")
+        assert result == {"tps": 32.1}
+
+    def test_unknown_variable_returns_none(self):
+        topic = "/v1.6/devices/tenebrios/unknown_sensor/lv"
+        assert parse_lv_message(topic, b"25.0") is None
+
+    def test_malformed_topic_returns_none(self):
+        assert parse_lv_message("/bad/topic", b"25.0") is None
+
+    def test_missing_lv_suffix_returns_none(self):
+        topic = "/v1.6/devices/tenebrios/t1/last"
+        assert parse_lv_message(topic, b"25.0") is None
+
+    def test_non_numeric_payload_returns_none(self):
+        topic = "/v1.6/devices/tenebrios/t1/lv"
+        assert parse_lv_message(topic, b"not_a_number") is None
+
+    def test_empty_payload_returns_none(self):
+        topic = "/v1.6/devices/tenebrios/t1/lv"
+        assert parse_lv_message(topic, b"") is None
+
+    def test_whitespace_payload_stripped(self):
+        topic = "/v1.6/devices/tenebrios/t2/lv"
+        result = parse_lv_message(topic, b"  26.3  ")
+        assert result == {"t2": 26.3}
+
+    def test_negative_value_accepted(self):
+        topic = "/v1.6/devices/tenebrios/tps/lv"
+        result = parse_lv_message(topic, b"-5.2")
+        assert result == {"tps": -5.2}
+
+    def test_all_known_labels_accepted(self):
+        labels = ["t1", "t2", "t3", "t4", "t5", "tps", "ventilador", "extractor"]
+        for label in labels:
+            topic = f"/v1.6/devices/tenebrios/{label}/lv"
+            result = parse_lv_message(topic, b"1.0")
+            assert result == {label: 1.0}, f"Failed for label: {label}"
+
+
+================================================================================
+END OF PROMPT
+================================================================================

@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Temperature Heatmap 3D</title>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1c1208; color: #f0e6d6; min-height: 100vh;
+        }
+
+        /* Header con marca TECHNEBRIOS */
+        .header {
+            background: #bf6a1a; padding: 10px 24px; text-align: center;
+            border-bottom: 3px solid #8a4a0e;
+        }
+        .header h1 {
+            font-size: 1.6rem; color: #fff; font-weight: 800;
+            letter-spacing: 4px; text-transform: uppercase;
+        }
+        .header .subtitle {
+            font-size: 0.7rem; color: rgba(255,255,255,0.8);
+            letter-spacing: 3px; text-transform: uppercase; margin-top: 1px;
+        }
+        .header .conn-line {
+            font-size: 0.75rem; color: rgba(255,255,255,0.7); margin-top: 4px;
+        }
+        .dashboard {
+            display: flex; flex-direction: column;
+            height: calc(100vh - 68px); padding: 8px 12px; overflow: hidden;
+        }
+
+        /* Fila superior: tarjetas de estado */
+        .status-bar {
+            display: flex; gap: 8px; justify-content: center;
+            flex-wrap: wrap; margin-bottom: 8px; flex-shrink: 0;
+        }
+        .status-card {
+            background: #2a1e10; border-radius: 8px; padding: 6px 14px;
+            text-align: center; min-width: 110px; border: 1px solid #5a3a18;
+        }
+        .status-card .label {
+            font-size: 0.6rem; color: #a08060; text-transform: uppercase;
+            letter-spacing: 1px; margin-bottom: 2px;
+        }
+        .status-card .value { font-size: 1.2rem; font-weight: bold; }
+        .status-card .value.temp { color: #e8a030; }
+        .status-card .value.sensor { color: #e8a030; }
+        .status-card .value.on { color: #6dbf5a; }
+        .status-card .value.off { color: #d44; }
+        .status-card .value.waiting { color: #665540; }
+
+        /* Layout principal: render 3D izquierda + panel indicadores derecha */
+        .main-row {
+            display: flex; gap: 10px; flex: 1; min-height: 0;
+        }
+        #scene-container {
+            flex: 1; background: #2a1e10; border-radius: 10px; padding: 8px;
+            border: 1px solid #5a3a18; min-width: 0;
+        }
+        #scene3d { width: 100%; height: 100%; }
+
+        /* Panel lateral de indicadores */
+        .side-panel {
+            width: 320px; flex-shrink: 0; display: flex; flex-direction: column;
+            gap: 8px; overflow-y: auto;
+        }
+        .indicators-section {
+            padding: 10px; background: #2a1e10; border-radius: 10px;
+            border: 1px solid #5a3a18;
+        }
+        .indicators-section h2 {
+            font-size: 0.8rem; color: #d4853a; margin-bottom: 8px;
+            border-bottom: 1px solid #5a3a18; padding-bottom: 4px;
+        }
+
+        /* Termómetros verticales de temperatura */
+        .thermometers-row {
+            display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+        }
+        .thermometer {
+            display: flex; flex-direction: column; align-items: center;
+            min-width: 46px;
+        }
+        .thermometer .thermo-label {
+            font-size: 0.65rem; color: #a08060; text-transform: uppercase;
+            letter-spacing: 1px; margin-bottom: 2px;
+        }
+        .thermometer .thermo-value {
+            font-size: 0.75rem; font-weight: bold; color: #e8a030; margin-bottom: 4px;
+        }
+        .thermo-bar-wrap {
+            display: flex; align-items: stretch; gap: 3px;
+        }
+        .thermo-scale {
+            display: flex; flex-direction: column; justify-content: space-between;
+            font-size: 0.55rem; color: #7a6040; min-width: 22px; text-align: right;
+            padding: 1px 0;
+        }
+        .thermo-track {
+            width: 16px; height: 90px; background: #1a1008;
+            border-radius: 8px; position: relative;
+            border: 1px solid #4a3218;
+        }
+        .thermo-fill {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            border-radius: 0 0 8px 8px; transition: height 0.5s, background 0.5s;
+            z-index: 1;
+        }
+        /* Marcas de rango ideal en termómetros */
+        .thermo-mark {
+            position: absolute; left: -4px; right: -4px; height: 0;
+            border-top: 2px solid rgba(255,255,255,0.7);
+            z-index: 2; pointer-events: none;
+        }
+
+        /* Barras horizontales (humedad / amoníaco) */
+        .hbars-row {
+            display: flex; flex-direction: column; gap: 6px;
+        }
+        .hbar-item {
+            display: flex; align-items: center; gap: 6px;
+        }
+        .hbar-label {
+            font-size: 0.65rem; color: #a08060; text-transform: uppercase;
+            letter-spacing: 1px; min-width: 55px; text-align: right;
+        }
+        .hbar-track-wrap {
+            flex: 1; display: flex; flex-direction: column;
+        }
+        .hbar-track {
+            width: 100%; height: 14px; background: #1a1008;
+            border-radius: 7px; position: relative;
+            border: 1px solid #4a3218;
+        }
+        .hbar-fill {
+            position: absolute; top: 0; left: 0; bottom: 0;
+            border-radius: 7px 0 0 7px; transition: width 0.5s, background 0.5s;
+            z-index: 1;
+        }
+        /* Marcas de rango ideal en barras horizontales */
+        .hbar-mark {
+            position: absolute; top: -3px; bottom: -3px; width: 0;
+            border-left: 2px solid rgba(255,255,255,0.7);
+            z-index: 2; pointer-events: none;
+        }
+        .hbar-scale {
+            display: flex; justify-content: space-between;
+            font-size: 0.5rem; color: #7a6040; padding: 1px 2px 0;
+        }
+        .hbar-value {
+            font-size: 0.75rem; font-weight: bold; color: #e8a030;
+            min-width: 55px;
+        }
+
+        .footer { display: none; }
+        .connection-dot {
+            display: inline-block; width: 10px; height: 10px;
+            border-radius: 50%; margin-right: 6px; vertical-align: middle;
+        }
+        .connection-dot.ok { background: #6dbf5a; }
+        .connection-dot.err { background: #d44; }
+        .connection-dot.warn { background: #e8a030; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>TECHNEBR<span style="opacity:0.5">|</span>OS</h1>
+        <div class="subtitle">SUPER ALIMÉNTATE</div>
+        <div class="conn-line">
+            <span id="conn-dot" class="connection-dot err"></span>
+            <span id="conn-status">Connecting...</span>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <!-- Status cards row -->
+        <div class="status-bar">
+            <div class="status-card">
+                <div class="label">Exterior (TEX)</div>
+                <div class="value temp" id="ext-temp">-- &deg;C</div>
+            </div>
+            <div class="status-card">
+                <div class="label">Fan (Ventilador)</div>
+                <div class="value waiting" id="fan-status">--</div>
+            </div>
+            <div class="status-card">
+                <div class="label">Extractor</div>
+                <div class="value waiting" id="ext-status">--</div>
+            </div>
+        </div>
+
+        <!-- Fila principal: render 3D + panel lateral -->
+        <div class="main-row">
+            <div id="scene-container">
+                <div id="scene3d"></div>
+            </div>
+
+            <div class="side-panel">
+                <!-- Termómetros de temperatura -->
+                <div class="indicators-section">
+                    <h2>Temperatura</h2>
+                    <div class="thermometers-row" id="temp-thermometers">
+                        <div class="thermometer" id="thermo-t1">
+                            <div class="thermo-label">T1</div>
+                            <div class="thermo-value" id="thermo-val-t1">--</div>
+                            <div class="thermo-bar-wrap">
+                                <div class="thermo-scale"><span>32°</span><span>25°</span><span>18°</span></div>
+                                <div class="thermo-track"><div class="thermo-mark" style="bottom:35.7%" title="23°C"></div><div class="thermo-mark" style="bottom:71.4%" title="28°C"></div><div class="thermo-fill" id="thermo-fill-t1"></div></div>
+                            </div>
+                        </div>
+                        <div class="thermometer" id="thermo-t2">
+                            <div class="thermo-label">T2</div>
+                            <div class="thermo-value" id="thermo-val-t2">--</div>
+                            <div class="thermo-bar-wrap">
+                                <div class="thermo-scale"><span>32°</span><span>25°</span><span>18°</span></div>
+                                <div class="thermo-track"><div class="thermo-mark" style="bottom:35.7%" title="23°C"></div><div class="thermo-mark" style="bottom:71.4%" title="28°C"></div><div class="thermo-fill" id="thermo-fill-t2"></div></div>
+                            </div>
+                        </div>
+                        <div class="thermometer" id="thermo-t3">
+                            <div class="thermo-label">T3</div>
+                            <div class="thermo-value" id="thermo-val-t3">--</div>
+                            <div class="thermo-bar-wrap">
+                                <div class="thermo-scale"><span>32°</span><span>25°</span><span>18°</span></div>
+                                <div class="thermo-track"><div class="thermo-mark" style="bottom:35.7%" title="23°C"></div><div class="thermo-mark" style="bottom:71.4%" title="28°C"></div><div class="thermo-fill" id="thermo-fill-t3"></div></div>
+                            </div>
+                        </div>
+                        <div class="thermometer" id="thermo-t4">
+                            <div class="thermo-label">T4</div>
+                            <div class="thermo-value" id="thermo-val-t4">--</div>
+                            <div class="thermo-bar-wrap">
+                                <div class="thermo-scale"><span>32°</span><span>25°</span><span>18°</span></div>
+                                <div class="thermo-track"><div class="thermo-mark" style="bottom:35.7%" title="23°C"></div><div class="thermo-mark" style="bottom:71.4%" title="28°C"></div><div class="thermo-fill" id="thermo-fill-t4"></div></div>
+                            </div>
+                        </div>
+                        <div class="thermometer" id="thermo-t5">
+                            <div class="thermo-label">T5</div>
+                            <div class="thermo-value" id="thermo-val-t5">--</div>
+                            <div class="thermo-bar-wrap">
+                                <div class="thermo-scale"><span>32°</span><span>25°</span><span>18°</span></div>
+                                <div class="thermo-track"><div class="thermo-mark" style="bottom:35.7%" title="23°C"></div><div class="thermo-mark" style="bottom:71.4%" title="28°C"></div><div class="thermo-fill" id="thermo-fill-t5"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Barras de temperaturas promedio (TEX, TPS, TPI) -->
+                <div class="indicators-section">
+                    <h2>Temperaturas promedio</h2>
+                    <div class="hbars-row">
+                        <div class="hbar-item">
+                            <div class="hbar-label">TEX</div>
+                            <div class="hbar-track-wrap">
+                                <div class="hbar-track"><div class="hbar-mark" style="left:35.7%" title="23°C"></div><div class="hbar-mark" style="left:71.4%" title="28°C"></div><div class="hbar-fill" id="hbar-fill-tex"></div></div>
+                                <div class="hbar-scale"><span>18°</span><span>23°</span><span>25°</span><span>28°</span><span>32°</span></div>
+                            </div>
+                            <div class="hbar-value" id="hbar-val-tex">--</div>
+                        </div>
+                        <div class="hbar-item">
+                            <div class="hbar-label">TPS</div>
+                            <div class="hbar-track-wrap">
+                                <div class="hbar-track"><div class="hbar-mark" style="left:35.7%" title="23°C"></div><div class="hbar-mark" style="left:71.4%" title="28°C"></div><div class="hbar-fill" id="hbar-fill-tps"></div></div>
+                                <div class="hbar-scale"><span>18°</span><span>23°</span><span>25°</span><span>28°</span><span>32°</span></div>
+                            </div>
+                            <div class="hbar-value" id="hbar-val-tps">--</div>
+                        </div>
+                        <div class="hbar-item">
+                            <div class="hbar-label">TPI</div>
+                            <div class="hbar-track-wrap">
+                                <div class="hbar-track"><div class="hbar-mark" style="left:35.7%" title="23°C"></div><div class="hbar-mark" style="left:71.4%" title="28°C"></div><div class="hbar-fill" id="hbar-fill-tpi"></div></div>
+                                <div class="hbar-scale"><span>18°</span><span>23°</span><span>25°</span><span>28°</span><span>32°</span></div>
+                            </div>
+                            <div class="hbar-value" id="hbar-val-tpi">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Barras de humedad -->
+                <div class="indicators-section">
+                    <h2>Humedad</h2>
+                    <div class="hbars-row" id="humidity-bars">
+                        <div class="hbar-item">
+                            <div class="hbar-label">H1</div>
+                            <div class="hbar-track-wrap">
+                                <div class="hbar-track"><div class="hbar-mark" style="left:60%" title="60%"></div><div class="hbar-mark" style="left:88%" title="88%"></div><div class="hbar-fill" id="hbar-fill-h1"></div></div>
+                                <div class="hbar-scale"><span>0</span><span>40</span><span>60</span><span>70</span><span>90</span><span>100%</span></div>
+                            </div>
+                            <div class="hbar-value" id="hbar-val-h1">--%</div>
+                        </div>
+                        <div class="hbar-item">
+                            <div class="hbar-label">H2</div>
+                            <div class="hbar-track-wrap">
+                                <div class="hbar-track"><div class="hbar-mark" style="left:60%" title="60%"></div><div class="hbar-mark" style="left:88%" title="88%"></div><div class="hbar-fill" id="hbar-fill-h2"></div></div>
+                                <div class="hbar-scale"><span>0</span><span>40</span><span>60</span><span>70</span><span>90</span><span>100%</span></div>
+                            </div>
+                            <div class="hbar-value" id="hbar-val-h2">--%</div>
+                        </div>
+                        <div class="hbar-item">
+                            <div class="hbar-label">H3</div>
+                            <div class="hbar-track-wrap">
+                                <div class="hbar-track"><div class="hbar-mark" style="left:60%" title="60%"></div><div class="hbar-mark" style="left:88%" title="88%"></div><div class="hbar-fill" id="hbar-fill-h3"></div></div>
+                                <div class="hbar-scale"><span>0</span><span>40</span><span>60</span><span>70</span><span>90</span><span>100%</span></div>
+                            </div>
+                            <div class="hbar-value" id="hbar-val-h3">--%</div>
+                        </div>
+                        <div class="hbar-item">
+                            <div class="hbar-label">H4</div>
+                            <div class="hbar-track-wrap">
+                                <div class="hbar-track"><div class="hbar-mark" style="left:60%" title="60%"></div><div class="hbar-mark" style="left:88%" title="88%"></div><div class="hbar-fill" id="hbar-fill-h4"></div></div>
+                                <div class="hbar-scale"><span>0</span><span>40</span><span>60</span><span>70</span><span>90</span><span>100%</span></div>
+                            </div>
+                            <div class="hbar-value" id="hbar-val-h4">--%</div>
+                        </div>
+                        <div class="hbar-item">
+                            <div class="hbar-label">H5</div>
+                            <div class="hbar-track-wrap">
+                                <div class="hbar-track"><div class="hbar-mark" style="left:60%" title="60%"></div><div class="hbar-mark" style="left:88%" title="88%"></div><div class="hbar-fill" id="hbar-fill-h5"></div></div>
+                                <div class="hbar-scale"><span>0</span><span>40</span><span>60</span><span>70</span><span>90</span><span>100%</span></div>
+                            </div>
+                            <div class="hbar-value" id="hbar-val-h5">--%</div>
+                        </div>
+                        <div class="hbar-item">
+                            <div class="hbar-label">General</div>
+                            <div class="hbar-track-wrap">
+                                <div class="hbar-track"><div class="hbar-mark" style="left:60%" title="60%"></div><div class="hbar-mark" style="left:88%" title="88%"></div><div class="hbar-fill" id="hbar-fill-humidity_general"></div></div>
+                                <div class="hbar-scale"><span>0</span><span>40</span><span>60</span><span>70</span><span>90</span><span>100%</span></div>
+                            </div>
+                            <div class="hbar-value" id="hbar-val-humidity_general">--%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Barra de amoníaco -->
+                <div class="indicators-section">
+                    <h2>Amoníaco (PPM)</h2>
+                    <div class="hbars-row" id="ammonia-bar">
+                        <div class="hbar-item">
+                            <div class="hbar-label">NH₃</div>
+                            <div class="hbar-track-wrap">
+                                <div class="hbar-track"><div class="hbar-fill" id="hbar-fill-ammonia"></div></div>
+                                <div class="hbar-scale"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5 ppm</span></div>
+                            </div>
+                            <div class="hbar-value" id="hbar-val-ammonia">-- ppm</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">TENEBRIOS &mdash; Real-time IoT 3D Volumetric Temperature Monitor</div>
+
+    <script>
+        const REFRESH_MS = {{ refresh_ms }};
+        const FETCH_TIMEOUT_MS = 5000;
+        let plotInitialized = false;
+
+        // Colorscale: blue (cold <20) -> green (ideal 20-30) -> red (hot >30)
+        // Mapped to VMIN=15..VMAX=40: 20C=0.2, 25C=0.4, 30C=0.6
+        const TEMP_COLORSCALE = [
+            [0,    'rgb(0,0,200)'],      // 15 C — deep blue (very cold)
+            [0.1,  'rgb(0,80,255)'],     // 17.5 C — blue
+            [0.2,  'rgb(0,180,220)'],    // 20 C — cyan (cold limit)
+            [0.3,  'rgb(0,210,140)'],    // 22.5 C — teal-green
+            [0.4,  'rgb(0,200,0)'],      // 25 C — green (ideal center)
+            [0.5,  'rgb(140,220,0)'],    // 27.5 C — yellow-green
+            [0.6,  'rgb(255,220,0)'],    // 30 C — yellow (hot limit)
+            [0.75, 'rgb(255,140,0)'],    // 33.75 C — orange
+            [0.9,  'rgb(220,40,0)'],     // 37.5 C — red
+            [1,    'rgb(160,0,0)'],      // 40 C — dark red (very hot)
+        ];
+
+        // ---------------------------------------------------------------
+        // House wireframe: walls + door on LEFT wall (X=0) + triangular roof
+        // ---------------------------------------------------------------
+        function buildHouseStructure(xr, yr, zr) {
+            const [x0, x1] = xr;
+            const [y0, y1] = yr;
+            const [z0, z1] = zr;
+            const yMid = (y0 + y1) / 2;
+            const roofPeak = z1 + 1.5;
+
+            const doorZ1 = 2.0;
+
+            const segments = [];
+            function edge(a, b) { segments.push(a, b, null); }
+
+            // Floor
+            edge([x0,y0,z0],[x1,y0,z0]); edge([x1,y0,z0],[x1,y1,z0]);
+            edge([x1,y1,z0],[x0,y1,z0]); edge([x0,y1,z0],[x0,y0,z0]);
+            // Ceiling
+            edge([x0,y0,z1],[x1,y0,z1]); edge([x1,y0,z1],[x1,y1,z1]);
+            edge([x1,y1,z1],[x0,y1,z1]); edge([x0,y1,z1],[x0,y0,z1]);
+            // Pillars
+            edge([x0,y0,z0],[x0,y0,z1]); edge([x1,y0,z0],[x1,y0,z1]);
+            edge([x1,y1,z0],[x1,y1,z1]); edge([x0,y1,z0],[x0,y1,z1]);
+            // Roof
+            edge([x1,y0,z1],[x1,yMid,roofPeak]); edge([x1,y1,z1],[x1,yMid,roofPeak]);
+            edge([x0,y0,z1],[x0,yMid,roofPeak]); edge([x0,y1,z1],[x0,yMid,roofPeak]);
+            edge([x0,yMid,roofPeak],[x1,yMid,roofPeak]);
+            // Door on back wall (X=0)
+            const doorY0 = 2.5, doorY1 = 3.5;
+            edge([x0,doorY0,z0],[x0,doorY0,doorZ1]);
+            edge([x0,doorY0,doorZ1],[x0,doorY1,doorZ1]);
+            edge([x0,doorY1,doorZ1],[x0,doorY1,z0]);
+
+            // Planter box on left side wall (Y=0), ~3/4 along X from door
+            const py_p0 = y0 - 0.3, py_p1 = y0; // depth: sticks out 0.3m
+            const px_p0 = 5.5, px_p1 = 7.5;      // ~3/4 of wall (X=0..10)
+            const pz1 = 0.7;                      // height
+            // Bottom rectangle
+            edge([px_p0,py_p0,z0],[px_p1,py_p0,z0]); edge([px_p1,py_p0,z0],[px_p1,py_p1,z0]);
+            edge([px_p1,py_p1,z0],[px_p0,py_p1,z0]); edge([px_p0,py_p1,z0],[px_p0,py_p0,z0]);
+            // Top rectangle
+            edge([px_p0,py_p0,pz1],[px_p1,py_p0,pz1]); edge([px_p1,py_p0,pz1],[px_p1,py_p1,pz1]);
+            edge([px_p1,py_p1,pz1],[px_p0,py_p1,pz1]); edge([px_p0,py_p1,pz1],[px_p0,py_p0,pz1]);
+            // Vertical edges
+            edge([px_p0,py_p0,z0],[px_p0,py_p0,pz1]); edge([px_p1,py_p0,z0],[px_p1,py_p0,pz1]);
+            edge([px_p1,py_p1,z0],[px_p1,py_p1,pz1]); edge([px_p0,py_p1,z0],[px_p0,py_p1,pz1]);
+
+            const rx = [], ry = [], rz = [];
+            for (const p of segments) {
+                if (p === null) { rx.push(null); ry.push(null); rz.push(null); }
+                else { rx.push(p[0]); ry.push(p[1]); rz.push(p[2]); }
+            }
+            return {
+                type: 'scatter3d', mode: 'lines',
+                x: rx, y: ry, z: rz,
+                line: { color: 'rgba(208,168,120,0.5)', width: 3 },
+                hoverinfo: 'skip', showlegend: false,
+            };
+        }
+
+        // ---------------------------------------------------------------
+        // Connection & MQTT status indicator
+        // ---------------------------------------------------------------
+        function updateConnectionStatus(httpOk, mqttConnected) {
+            const dot = document.getElementById('conn-dot');
+            const label = document.getElementById('conn-status');
+
+            if (!httpOk) {
+                dot.className = 'connection-dot err';
+                label.textContent = 'Server unreachable';
+            } else if (!mqttConnected) {
+                dot.className = 'connection-dot warn';
+                label.textContent = 'MQTT disconnected — reconnecting...';
+            } else {
+                dot.className = 'connection-dot ok';
+                label.textContent = 'Receiving data';
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Dashboard status cards
+        // ---------------------------------------------------------------
+        function updateDashboard(data) {
+            updateConnectionStatus(true, data.mqtt_connected);
+
+            // Individual sensor cards
+            for (const [label, info] of Object.entries(data.sensors)) {
+                const el = document.getElementById('val-' + label);
+                if (el) {
+                    el.innerHTML = info.value !== null
+                        ? info.value.toFixed(1) + ' &deg;C' : '-- &deg;C';
+                }
+            }
+
+            // Exterior temp
+            const extEl = document.getElementById('ext-temp');
+            extEl.innerHTML = data.exterior_temp !== null
+                ? data.exterior_temp.toFixed(1) + ' &deg;C' : '-- &deg;C';
+
+            // Fan / Extractor
+            const fanEl = document.getElementById('fan-status');
+            fanEl.textContent = data.fan_on ? 'ON' : 'OFF';
+            fanEl.className = 'value ' + (data.fan_on ? 'on' : 'off');
+
+            const extSt = document.getElementById('ext-status');
+            extSt.textContent = data.extractor_on ? 'ON' : 'OFF';
+            extSt.className = 'value ' + (data.extractor_on ? 'on' : 'off');
+        }
+
+        // ---------------------------------------------------------------
+        // Funciones de color para indicadores
+        // ---------------------------------------------------------------
+
+        // Temperatura: 18°C azul → 25°C verde → 32°C rojo
+        function tempColor(value) {
+            const t = Math.max(18, Math.min(32, value));
+            let r, g, b;
+            if (t <= 25) {
+                // azul (0,80,255) → verde (0,200,0)
+                const p = (t - 18) / 7;
+                r = 0;
+                g = Math.round(80 + p * 120);
+                b = Math.round(255 - p * 255);
+            } else {
+                // verde (0,200,0) → rojo (220,40,0)
+                const p = (t - 25) / 7;
+                r = Math.round(p * 220);
+                g = Math.round(200 - p * 160);
+                b = 0;
+            }
+            return `rgb(${r},${g},${b})`;
+        }
+
+        // Humedad: <40% azul fuerte → <60% azul claro → 60-70% verde → >90% rojo
+        function humidityColor(value) {
+            const h = Math.max(0, Math.min(100, value));
+            let r, g, b;
+            if (h <= 40) {
+                // azul muy fuerte
+                r = 0; g = 40; b = 220;
+            } else if (h <= 60) {
+                // azul fuerte → azul claro
+                const p = (h - 40) / 20;
+                r = 0;
+                g = Math.round(40 + p * 160);
+                b = Math.round(220 + p * 35);
+            } else if (h <= 70) {
+                // azul claro → verde
+                const p = (h - 60) / 10;
+                r = 0;
+                g = Math.round(200 + p * 20);
+                b = Math.round(255 - p * 255);
+            } else if (h <= 90) {
+                // verde → rojo
+                const p = (h - 70) / 20;
+                r = Math.round(p * 220);
+                g = Math.round(220 - p * 180);
+                b = 0;
+            } else {
+                // rojo (peligroso)
+                r = 220; g = 40; b = 0;
+            }
+            return `rgb(${r},${g},${b})`;
+        }
+
+        // Amoníaco: 0-1 verde → >2 amarillo → >3 rojo
+        function ammoniaColor(value) {
+            const a = Math.max(0, Math.min(5, value));
+            let r, g, b;
+            if (a <= 1) {
+                r = 0; g = 200; b = 0;
+            } else if (a <= 2) {
+                const p = (a - 1);
+                r = Math.round(p * 240);
+                g = Math.round(200 + p * 20);
+                b = 0;
+            } else if (a <= 3) {
+                const p = (a - 2);
+                r = Math.round(240 - p * 20);
+                g = Math.round(220 - p * 180);
+                b = 0;
+            } else {
+                r = 220; g = 40; b = 0;
+            }
+            return `rgb(${r},${g},${b})`;
+        }
+
+        // ---------------------------------------------------------------
+        // Actualizar indicadores ambientales
+        // ---------------------------------------------------------------
+        function updateIndicators(data) {
+            // Termómetros de temperatura (rango 18-32 para la barra)
+            const TEMP_BAR_MIN = 18, TEMP_BAR_MAX = 32;
+            for (const [label, info] of Object.entries(data.sensors)) {
+                const valEl = document.getElementById('thermo-val-' + label);
+                const fillEl = document.getElementById('thermo-fill-' + label);
+                if (!valEl || !fillEl) continue;
+
+                if (info.value !== null) {
+                    valEl.textContent = info.value.toFixed(1) + ' °C';
+                    const pct = Math.max(0, Math.min(100,
+                        (info.value - TEMP_BAR_MIN) / (TEMP_BAR_MAX - TEMP_BAR_MIN) * 100));
+                    fillEl.style.height = pct + '%';
+                    fillEl.style.background = tempColor(info.value);
+                } else {
+                    valEl.textContent = '-- °C';
+                    fillEl.style.height = '0%';
+                }
+            }
+
+            // Barras de humedad (rango 0-100%)
+            if (data.humidity) {
+                for (const [label, value] of Object.entries(data.humidity)) {
+                    const valEl = document.getElementById('hbar-val-' + label);
+                    const fillEl = document.getElementById('hbar-fill-' + label);
+                    if (!valEl || !fillEl) continue;
+
+                    if (value !== null) {
+                        valEl.textContent = value.toFixed(1) + ' %';
+                        fillEl.style.width = Math.max(0, Math.min(100, value)) + '%';
+                        fillEl.style.background = humidityColor(value);
+                    } else {
+                        valEl.textContent = '-- %';
+                        fillEl.style.width = '0%';
+                    }
+                }
+            }
+
+            // Barras de temperaturas promedio (TEX, TPS, TPI)
+            const avgTemps = {
+                'tex': data.exterior_temp,
+                'tps': data.avg_temp_superior,
+                'tpi': data.avg_temp_inferior,
+            };
+            for (const [key, value] of Object.entries(avgTemps)) {
+                const valEl = document.getElementById('hbar-val-' + key);
+                const fillEl = document.getElementById('hbar-fill-' + key);
+                if (!valEl || !fillEl) continue;
+                if (value !== null && value !== undefined) {
+                    valEl.textContent = value.toFixed(1) + ' °C';
+                    const pct = Math.max(0, Math.min(100,
+                        (value - TEMP_BAR_MIN) / (TEMP_BAR_MAX - TEMP_BAR_MIN) * 100));
+                    fillEl.style.width = pct + '%';
+                    fillEl.style.background = tempColor(value);
+                } else {
+                    valEl.textContent = '-- °C';
+                    fillEl.style.width = '0%';
+                }
+            }
+
+            // Barra de amoníaco (rango 0-5 ppm para la barra)
+            const AMMONIA_BAR_MAX = 5;
+            const amValEl = document.getElementById('hbar-val-ammonia');
+            const amFillEl = document.getElementById('hbar-fill-ammonia');
+            if (amValEl && amFillEl) {
+                if (data.amoniaco !== null && data.amoniaco !== undefined) {
+                    amValEl.textContent = data.amoniaco.toFixed(2) + ' ppm';
+                    const pct = Math.max(0, Math.min(100,
+                        data.amoniaco / AMMONIA_BAR_MAX * 100));
+                    amFillEl.style.width = pct + '%';
+                    amFillEl.style.background = ammoniaColor(data.amoniaco);
+                } else {
+                    amValEl.textContent = '-- ppm';
+                    amFillEl.style.width = '0%';
+                }
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Safe camera read (Plotly private API, wrapped in try/catch)
+        // ---------------------------------------------------------------
+        function getCurrentCamera() {
+            try {
+                const el = document.getElementById('scene3d');
+                if (el._fullLayout && el._fullLayout.scene && el._fullLayout.scene._scene) {
+                    return el._fullLayout.scene._scene.getCamera();
+                }
+            } catch (e) {
+                // Private API may change across Plotly versions
+            }
+            return null;
+        }
+
+        // ---------------------------------------------------------------
+        // 3D scene builder
+        // ---------------------------------------------------------------
+        function buildScene(data) {
+            if (!data.volume_data) return;
+
+            const vol = data.volume_data;
+
+            // Compute actual data range
+            let volMin = Infinity, volMax = -Infinity;
+            for (let i = 0; i < vol.value.length; i++) {
+                if (vol.value[i] < volMin) volMin = vol.value[i];
+                if (vol.value[i] > volMax) volMax = vol.value[i];
+            }
+
+            // Multiple isosurface slices to fill the entire room with color
+            // Use fixed range from config (data.vmin / data.vmax) for consistent colors
+            const nSlices = 10;
+            const step = (volMax - volMin) / nSlices;
+            const isoTraces = [];
+            for (let s = 0; s < nSlices; s++) {
+                const lo = volMin + s * step;
+                const hi = lo + step;
+                isoTraces.push({
+                    type: 'isosurface',
+                    x: vol.x, y: vol.y, z: vol.z,
+                    value: vol.value,
+                    isomin: lo,
+                    isomax: hi,
+                    surface: { show: true, count: 2 },
+                    caps: { x: {show: true}, y: {show: true}, z: {show: true} },
+                    colorscale: TEMP_COLORSCALE,
+                    cmin: data.vmin,
+                    cmax: data.vmax,
+                    opacity: 0.35,
+                    showscale: s === 0,
+                    colorbar: s === 0 ? {
+                        title: { text: '°C', font: { color: '#c0a080', size: 14 } },
+                        tickfont: { color: '#c0a080', size: 11 },
+                        len: 0.6, thickness: 18,
+                    } : undefined,
+                    hovertemplate: 'X: %{x:.1f}m<br>Y: %{y:.1f}m<br>Z: %{z:.1f}m<br>Temp: %{value:.1f} °C<extra></extra>',
+                });
+            }
+
+            // Sensor markers (white dots)
+            const sx = [], sy = [], sz = [], sHover = [];
+            for (const [label, info] of Object.entries(data.sensors)) {
+                sx.push(info.x); sy.push(info.y); sz.push(info.z);
+                const val = info.value !== null ? info.value.toFixed(1) + ' °C' : '--';
+                sHover.push('<b>' + label + '</b>: ' + val + '<br>Z: ' + info.z.toFixed(1) + 'm');
+            }
+            if (data.tex_sensor) {
+                const tex = data.tex_sensor;
+                sx.push(tex.x); sy.push(tex.y); sz.push(tex.z);
+                const texVal = tex.value !== null ? tex.value.toFixed(1) + ' °C' : '--';
+                sHover.push('<b>tex (ext)</b>: ' + texVal + '<br>Z: ' + tex.z.toFixed(1) + 'm');
+            }
+
+            const markerTrace = {
+                type: 'scatter3d', mode: 'markers',
+                x: sx, y: sy, z: sz,
+                customdata: sHover,
+                marker: {
+                    size: 7, color: '#ffffff',
+                    line: { color: '#000', width: 1.5 }, symbol: 'circle',
+                },
+                hovertemplate: '%{customdata}<extra></extra>',
+                showlegend: false,
+            };
+
+            // Sensor name labels (white, above marker)
+            const nameTexts = [];
+            for (const label of Object.keys(data.sensors)) nameTexts.push(label);
+            if (data.tex_sensor) nameTexts.push('tex');
+
+            const nameTrace = {
+                type: 'scatter3d', mode: 'text',
+                x: sx.map((v, i) => v), y: sy, z: sz.map(v => v + 0.25),
+                text: nameTexts,
+                textposition: 'top center',
+                textfont: { color: '#ffffff', size: 11, family: 'monospace' },
+                hoverinfo: 'skip', showlegend: false,
+            };
+
+            // Sensor value labels (orange, below name)
+            const valTexts = [];
+            for (const info of Object.values(data.sensors)) {
+                valTexts.push(info.value !== null ? info.value.toFixed(1) + ' °C' : '--');
+            }
+            if (data.tex_sensor) {
+                const texv = data.tex_sensor.value;
+                valTexts.push(texv !== null ? texv.toFixed(1) + ' °C' : '--');
+            }
+
+            const valTrace = {
+                type: 'scatter3d', mode: 'text',
+                x: sx, y: sy, z: sz.map(v => v + 0.05),
+                text: valTexts,
+                textposition: 'top center',
+                textfont: { color: '#ffaa00', size: 11, family: 'monospace' },
+                hoverinfo: 'skip', showlegend: false,
+            };
+
+            // Drop lines
+            const dlx = [], dly = [], dlz = [];
+            for (let i = 0; i < sx.length; i++) {
+                dlx.push(sx[i], sx[i], null);
+                dly.push(sy[i], sy[i], null);
+                dlz.push(0, sz[i], null);
+            }
+            const dropLines = {
+                type: 'scatter3d', mode: 'lines',
+                x: dlx, y: dly, z: dlz,
+                line: { color: 'rgba(255,255,255,0.25)', width: 2, dash: 'dot' },
+                hoverinfo: 'skip', showlegend: false,
+            };
+
+            // House wireframe
+            const house = buildHouseStructure(data.x_range, data.y_range, data.z_range);
+
+            const traces = [...isoTraces, house, dropLines, markerTrace, nameTrace, valTrace];
+
+            const roofPeak = data.z_range[1] + 1.5;
+            const layout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                font: { color: '#c0a080' },
+                margin: { t: 10, r: 10, b: 10, l: 10 },
+                showlegend: false,
+                scene: {
+                    xaxis: {
+                        title: 'X (m)', range: [data.x_range[0] - 0.5, data.x_range[1] + 0.5],
+                        color: '#a08060', gridcolor: '#3a2a14', backgroundcolor: '#1a1008',
+                    },
+                    yaxis: {
+                        title: 'Y (m)', range: [data.y_range[0] - 1, data.y_range[1] + 0.5],
+                        color: '#a08060', gridcolor: '#3a2a14', backgroundcolor: '#1a1008',
+                    },
+                    zaxis: {
+                        title: 'Z (m)', range: [0, roofPeak + 0.3],
+                        color: '#a08060', gridcolor: '#3a2a14', backgroundcolor: '#1a1008',
+                    },
+                    aspectratio: { x: 2, y: 1.2, z: 1 },
+                    camera: {
+                        eye: { x: 1.6, y: -1.8, z: 1.0 },
+                        up: { x: 0, y: 0, z: 1 },
+                    },
+                    bgcolor: '#1a1008',
+                },
+            };
+
+            const plotConfig = { responsive: true, displayModeBar: false };
+
+            if (!plotInitialized) {
+                Plotly.newPlot('scene3d', traces, layout, plotConfig);
+                plotInitialized = true;
+            } else {
+                const cam = getCurrentCamera();
+                if (cam) layout.scene.camera = cam;
+                Plotly.react('scene3d', traces, layout, plotConfig);
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // Data polling with timeout
+        // ---------------------------------------------------------------
+        async function fetchData() {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+            try {
+                const resp = await fetch('/api/data', { signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (!resp.ok) throw new Error('API error');
+                const data = await resp.json();
+                updateDashboard(data);
+                updateIndicators(data);
+                buildScene(data);
+            } catch (err) {
+                clearTimeout(timeoutId);
+                updateConnectionStatus(false, false);
+            }
+        }
+
+        fetchData();
+        setInterval(fetchData, REFRESH_MS);
+    </script>
+</body>
+</html>
