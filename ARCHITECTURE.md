@@ -1,67 +1,67 @@
-# Architecture
+# Arquitectura
 
-## Components
+## Componentes
 
-- **MQTT Client** — Connects to the Ubidots MQTT broker and subscribes to sensor data using the `/lv` (last value) topic format.
-- **Heatmap Engine** — Stores the latest sensor temperatures, humidity, radiant floor data, and produces 3D interpolated temperature and humidity volumes using `scipy.interpolate.griddata`.
-- **API Server** — Flask web server that exposes JSON API endpoints for real-time data, historical data from Ubidots, and server-side interpolation.
-- **Visualization Frontend** — Plotly.js-based dashboard that renders an interactive 3D volumetric heatmap with toggle between temperature/humidity views, environmental indicators, and a historical data timeline.
+- **Cliente MQTT** — Se conecta al broker MQTT de Ubidots y se suscribe a datos de sensores usando el formato de tópico `/lv` (último valor).
+- **Motor Heatmap** — Almacena las últimas temperaturas, humedad y datos del piso radiante. Produce volúmenes 3D interpolados de temperatura y humedad usando `scipy.interpolate.griddata`.
+- **Servidor API** — Servidor web Flask que expone endpoints JSON para datos en tiempo real, datos históricos desde Ubidots e interpolación del lado del servidor.
+- **Frontend de Visualización** — Dashboard basado en Plotly.js que renderiza un mapa de calor volumétrico 3D interactivo con cambio entre vistas de temperatura/humedad, indicadores ambientales y línea de tiempo histórica.
 
-## Architecture Diagram
+## Diagrama de Arquitectura
 
 ```
-Sensors (t1–t5, tex, tps, tpi, h1–h5, hum_general, amoniaco,
-         temperatura1, temperatura3, ventilador, extractor)
+Sensores (t1–t5, tex, tps, tpi, h1–h5, hum_general, amoniaco,
+          temperatura1, temperatura3, ventilador, extractor)
        │
-       │  MQTT (Ubidots /lv topics)
+       │  MQTT (tópicos Ubidots /lv)
        ▼
-  MQTT Client  (backend/mqtt_client.py)
+  Cliente MQTT  (backend/mqtt_client.py)
        │
-       │  Parsed sensor readings
+       │  Lecturas de sensores parseadas
        ▼
-  Heatmap Engine  (backend/heatmap_engine.py)
+  Motor Heatmap  (backend/heatmap_engine.py)
        │
-       │  3D interpolated volumes (temp + humidity)
+       │  Volúmenes 3D interpolados (temp + humedad)
        ▼
-  Flask API  (backend/visualization.py)
+  API Flask  (backend/visualization.py)
        │
-       │  JSON over HTTP (/api/data, /api/history, /api/history/interpolate)
+       │  JSON sobre HTTP (/api/data, /api/history, /api/history/interpolate)
        ▼
   Frontend  (templates/index.html — Plotly.js)
        │
-       ▲  Historical data
+       ▲  Datos históricos
        │
-  Ubidots REST API  (queried by /api/history endpoint)
+  API REST Ubidots  (consultada por endpoint /api/history)
 ```
 
-## Component Responsibilities
+## Responsabilidades de Componentes
 
 ### backend/mqtt_client.py
 
-Manages the MQTT connection to Ubidots. Subscribes to `/v1.6/devices/{device}/+/lv` and parses the plain numeric payloads into `{label: value}` dictionaries. Forwards parsed data to a callback (the heatmap engine). Supports all variable types: temperature, humidity, averages, radiant floor, ammonia, and device states.
+Administra la conexión MQTT a Ubidots. Se suscribe a `/v1.6/devices/{device}/+/lv` y parsea los payloads numéricos planos en diccionarios `{etiqueta: valor}`. Reenvía datos parseados a un callback (el motor heatmap). Soporta todos los tipos de variables: temperatura, humedad, promedios, piso radiante, amoníaco y estados de dispositivos.
 
 ### backend/heatmap_engine.py
 
-Thread-safe data store. Receives sensor updates, validates values against a physically plausible range, and performs 3D volumetric interpolation using `scipy.interpolate.griddata` (nearest-neighbor + linear) for both temperature and humidity. Also tracks exterior temperature, average temperatures, radiant floor sensors, humidity, ammonia, fan/extractor states, and last update timestamp.
+Almacén de datos thread-safe. Recibe actualizaciones de sensores, valida valores contra un rango físicamente plausible, y realiza interpolación volumétrica 3D usando `scipy.interpolate.griddata` (vecino más cercano + lineal) tanto para temperatura como humedad. También rastrea temperatura exterior, temperaturas promedio, sensores del piso radiante, humedad, amoníaco, estados de ventilador/extractor y timestamp de última actualización.
 
 ### backend/visualization.py
 
-Flask application with four routes:
-- `GET /` — Renders the Plotly.js dashboard.
-- `GET /api/data` — Returns JSON with interpolated 3D volumes (temperature and humidity), sensor data, radiant floor data, and device states.
-- `GET /api/history` — Fetches historical data from Ubidots REST API for a date range.
-- `GET /api/history/interpolate` — Server-side 3D interpolation for a specific historical moment.
+Aplicación Flask con cuatro rutas:
+- `GET /` — Renderiza el dashboard Plotly.js.
+- `GET /api/data` — Retorna JSON con volúmenes 3D interpolados (temperatura y humedad), datos de sensores, datos del piso radiante y estados de dispositivos.
+- `GET /api/history` — Consulta datos históricos desde la API REST de Ubidots para un rango de fechas.
+- `GET /api/history/interpolate` — Interpolación 3D del lado del servidor para un momento histórico específico.
 
 ### backend/config.py
 
-Central configuration module containing MQTT credentials, sensor positions, room dimensions, grid resolution, temperature ranges, radiant floor labels, humidity labels, ammonia label, and web server settings.
+Módulo central de configuración que contiene credenciales MQTT, posiciones de sensores, dimensiones del cuarto, resolución de grilla, rangos de temperatura, etiquetas del piso radiante, etiquetas de humedad, etiqueta de amoníaco y configuración del servidor web.
 
 ### templates/index.html
 
-Single-page dashboard using Plotly.js with:
-- 3D isosurface render with temperature/humidity toggle
-- 3D wireframe (inclined roof, windows, furniture, lamps, radiant floor)
-- Side panel with thermometers, humidity bars, ammonia bar, radiant floor bars, and device widgets
-- Historical data viewer with timeline slider
-- Responsive design (desktop + mobile)
-- Branded header (TECHNEBRIOS + Ingenieria Condor)
+Dashboard de una sola página usando Plotly.js con:
+- Render 3D de isosuperficies con cambio temperatura/humedad
+- Wireframe 3D (techo inclinado, ventanas, mueble, lámparas, piso radiante)
+- Panel lateral con termómetros, barras de humedad, barra de amoníaco, barras del piso radiante y widgets de dispositivos
+- Visor de datos históricos con slider de línea de tiempo
+- Diseño responsivo (escritorio + móvil)
+- Header con marca (TECHNEBRIOS + Ingeniería Condor)

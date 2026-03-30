@@ -1,22 +1,22 @@
-# API Reference
+# Referencia de API
 
 ## GET /
 
-Renders the main dashboard page.
+Renderiza la página principal del dashboard.
 
-- **Response:** HTML page with the Plotly.js 3D volumetric heatmap.
+- **Respuesta:** Página HTML con el mapa de calor volumétrico 3D Plotly.js.
 - **Content-Type:** `text/html`
 
-The dashboard auto-refreshes by polling `/api/data` every 2 seconds (configurable via `ANIMATION_INTERVAL_MS` in `backend/config.py`).
+El dashboard se actualiza automáticamente consultando `/api/data` cada 2 segundos (configurable vía `ANIMATION_INTERVAL_MS` en `backend/config.py`).
 
 ## GET /api/data
 
-Returns JSON data for the 3D heatmap visualization.
+Retorna datos JSON para la visualización del mapa de calor 3D.
 
-- **Response:** JSON object
+- **Respuesta:** Objeto JSON
 - **Content-Type:** `application/json`
 
-### Success Response (200)
+### Respuesta Exitosa (200)
 
 ```json
 {
@@ -73,46 +73,46 @@ Returns JSON data for the 3D heatmap visualization.
 }
 ```
 
-### Fields
+### Campos
 
-| Field | Type | Description |
+| Campo | Tipo | Descripción |
 |-------|------|-------------|
-| `volume_data` | object or null | Interpolated 3D temperature volume. Null if fewer than 3 sensors reported. |
-| `humidity_volume_data` | object or null | Interpolated 3D humidity volume. Null if fewer than 3 sensors reported. |
-| `x_range` | array | Room X boundaries in meters `[min, max]`. |
-| `y_range` | array | Room Y boundaries in meters `[min, max]`. |
-| `z_range` | array | Room Z boundaries in meters `[min, max]`. |
-| `vmin` | float | Minimum temperature for the color scale (14°C). |
-| `vmax` | float | Maximum temperature for the color scale (35°C). |
-| `exterior_temp` | float or null | Latest exterior sensor (tex) reading. |
-| `avg_temp_superior` | float or null | Average upper sensors temperature (tps). |
-| `avg_temp_inferior` | float or null | Average lower sensors temperature (tpi). |
-| `fan_on` | boolean | Whether the fan is currently on. |
-| `extractor_on` | boolean | Whether the extractor is currently on. |
-| `mqtt_connected` | boolean | Whether the MQTT client is connected to the broker. |
-| `last_update` | string or null | Timestamp of last MQTT message received. |
-| `sensors` | object | Per-sensor position and latest value. |
-| `tex_sensor` | object | Exterior sensor position and latest value. |
-| `humidity` | object | Per-sensor humidity values (h1–h5, hum_general). |
-| `amoniaco` | float or null | Latest ammonia sensor reading in PPM. |
-| `radiant_floor` | object | Radiant floor sensor values (temperatura1, temperatura3) with name and value. |
+| `volume_data` | objeto o null | Volumen 3D de temperatura interpolado. Null si menos de 3 sensores reportaron. |
+| `humidity_volume_data` | objeto o null | Volumen 3D de humedad interpolado. Null si menos de 3 sensores reportaron. |
+| `x_range` | arreglo | Límites X del cuarto en metros `[min, max]`. |
+| `y_range` | arreglo | Límites Y del cuarto en metros `[min, max]`. |
+| `z_range` | arreglo | Límites Z del cuarto en metros `[min, max]`. |
+| `vmin` | float | Temperatura mínima para la escala de color (14°C). |
+| `vmax` | float | Temperatura máxima para la escala de color (35°C). |
+| `exterior_temp` | float o null | Última lectura del sensor exterior (tex). |
+| `avg_temp_superior` | float o null | Temperatura promedio de sensores superiores (tps). |
+| `avg_temp_inferior` | float o null | Temperatura promedio de sensores inferiores (tpi). |
+| `fan_on` | booleano | Si el ventilador está actualmente encendido. |
+| `extractor_on` | booleano | Si el extractor está actualmente encendido. |
+| `mqtt_connected` | booleano | Si el cliente MQTT está conectado al broker. |
+| `last_update` | cadena o null | Timestamp del último mensaje MQTT recibido. |
+| `sensors` | objeto | Posición y último valor por sensor. |
+| `tex_sensor` | objeto | Posición y último valor del sensor exterior. |
+| `humidity` | objeto | Valores de humedad por sensor (h1–h5, hum_general). |
+| `amoniaco` | float o null | Última lectura del sensor de amoníaco en PPM. |
+| `radiant_floor` | objeto | Valores de los sensores del piso radiante (temperatura1, temperatura3) con nombre y valor. |
 
 ## GET /api/history
 
-Returns historical temperature and humidity data from Ubidots API.
+Retorna datos históricos de temperatura y humedad desde la API de Ubidots.
 
-- **Parameters:**
-  - `start` (required): Start date in `YYYY-MM-DD` format
-  - `end` (required): End date in `YYYY-MM-DD` format
-- **Response:** JSON object with timestamped values per variable
+- **Parámetros:**
+  - `start` (requerido): Fecha de inicio en formato `YYYY-MM-DD`
+  - `end` (requerido): Fecha de fin en formato `YYYY-MM-DD`
+- **Respuesta:** Objeto JSON con valores por variable con timestamps
 
-### Example Request
+### Ejemplo de Solicitud
 
 ```
 GET /api/history?start=2026-03-25&end=2026-03-27
 ```
 
-### Response
+### Respuesta
 
 ```json
 {
@@ -131,16 +131,16 @@ GET /api/history?start=2026-03-25&end=2026-03-27
 
 ## GET /api/history/interpolate
 
-Interpolates a 3D volume for a specific moment using provided sensor values.
+Interpola un volumen 3D para un momento específico usando valores de sensores proporcionados.
 
-- **Parameters:**
-  - `temps` (required): JSON string with temperature values, e.g. `{"t1":25,"t2":24,...}`
-  - `hums` (optional): JSON string with humidity values, e.g. `{"h1":46,"h2":21,...}`
-- **Response:** JSON with `volume_data` and `humidity_volume_data`
+- **Parámetros:**
+  - `temps` (requerido): Cadena JSON con valores de temperatura, ej. `{"t1":25,"t2":24,...}`
+  - `hums` (opcional): Cadena JSON con valores de humedad, ej. `{"h1":46,"h2":21,...}`
+- **Respuesta:** JSON con `volume_data` y `humidity_volume_data`
 
-### Error Response (503)
+### Respuesta de Error (503)
 
-Returned if the engine has not been initialized.
+Retornado si el motor no ha sido inicializado.
 
 ```json
 {

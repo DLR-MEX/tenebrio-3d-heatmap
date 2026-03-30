@@ -1,72 +1,72 @@
-# System Description
+# Descripción del Sistema
 
-## System Context
+## Contexto del Sistema
 
-This system monitors the internal temperature, humidity, and environmental conditions of a mealworm (Tenebrio molitor) breeding room. The room measures approximately 10 m (length) x 6 m (width) x 3 m (height) with an inclined roof (high at Y=0, low at Y=6). Maintaining a stable and uniform temperature and humidity is critical for optimal larval development and production yield.
+Este sistema monitorea la temperatura interna, humedad y condiciones ambientales de un cuarto de cría de Tenebrio molitor (gusano de la harina). El cuarto mide aproximadamente 10 m (largo) x 6 m (ancho) x 3 m (alto) con un techo inclinado (alto en Y=0, bajo en Y=6). Mantener una temperatura y humedad estable y uniforme es crítico para el desarrollo óptimo de las larvas y el rendimiento de producción.
 
-## Sensors
+## Sensores
 
-### Temperature Sensors (Interior)
+### Sensores de Temperatura (Interior)
 
-| Sensor | Position (x, y, z) | Location |
+| Sensor | Posición (x, y, z) | Ubicación |
 |--------|-------------------|----------|
-| t1 | (2, 3, 2.5) | Upper level |
-| t2 | (5, 3, 2.5) | Upper level |
-| t3 | (8, 3, 2.5) | Upper level |
-| t4 | (3, 3, 1.0) | Lower level |
-| t5 | (7, 3, 1.0) | Lower level |
+| t1 | (2, 3, 2.5) | Nivel superior |
+| t2 | (5, 3, 2.5) | Nivel superior |
+| t3 | (8, 3, 2.5) | Nivel superior |
+| t4 | (3, 3, 1.0) | Nivel inferior |
+| t5 | (7, 3, 1.0) | Nivel inferior |
 
-### Exterior Temperature Sensor
+### Sensor de Temperatura Exterior
 
-| Sensor | Position (x, y, z) | Location |
+| Sensor | Posición (x, y, z) | Ubicación |
 |--------|-------------------|----------|
-| tex | (2, 6.15, 0.8) | Planter on back wall (Y=6) |
+| tex | (2, 6.15, 0.8) | Jardinera en pared trasera (Y=6) |
 
-### Average Temperature Sensors
+### Sensores de Temperatura Promedio
 
-| Sensor | Description |
+| Sensor | Descripción |
 |--------|-------------|
-| tps | Average upper sensors temperature |
-| tpi | Average lower sensors temperature |
+| tps | Temperatura promedio sensores superiores |
+| tpi | Temperatura promedio sensores inferiores |
 
-### Humidity Sensors
+### Sensores de Humedad
 
-| Sensor | Description |
+| Sensor | Descripción |
 |--------|-------------|
-| h1–h5 | Interior humidity (same positions as t1–t5) |
-| hum_general | General room humidity |
+| h1–h5 | Humedad interior (mismas posiciones que t1–t5) |
+| hum_general | Humedad general del cuarto |
 
-### Radiant Floor Sensors
+### Sensores del Piso Radiante
 
-| Sensor | Description |
+| Sensor | Descripción |
 |--------|-------------|
-| temperatura1 | Floor output temperature |
-| temperatura3 | Mid-floor temperature |
+| temperatura1 | Temperatura de salida del piso |
+| temperatura3 | Temperatura medio piso |
 
-### Other Sensors
+### Otros Sensores
 
-| Sensor | Description |
+| Sensor | Descripción |
 |--------|-------------|
-| amoniaco | Ammonia concentration (PPM) |
-| ventilador | Fan status (on/off) |
-| extractor | Extractor status (on/off) |
+| amoniaco | Concentración de amoníaco (PPM) |
+| ventilador | Estado del ventilador (encendido/apagado) |
+| extractor | Estado del extractor (encendido/apagado) |
 
-All sensors publish data to the Ubidots IoT platform via MQTT.
+Todos los sensores publican datos a la plataforma IoT Ubidots vía MQTT.
 
-## Monitoring Goal
+## Objetivo del Monitoreo
 
-The goal is to detect thermal gradients, hot spots, and cold zones inside the breeding room in real time. This allows operators to:
+El objetivo es detectar gradientes térmicos, puntos calientes y zonas frías dentro del cuarto de cría en tiempo real. Esto permite a los operadores:
 
-- Verify that the room temperature stays within the ideal range (23–28 °C).
-- Monitor humidity levels within the ideal range (60–88%).
-- Track ammonia concentration (ideal: 0–1 PPM).
-- Monitor radiant floor heating system performance.
-- Compare interior temperature against the exterior reference.
-- Monitor the fan and extractor operational status.
-- Review historical data trends using the timeline slider.
+- Verificar que la temperatura del cuarto se mantiene dentro del rango ideal (23–28 °C).
+- Monitorear niveles de humedad dentro del rango ideal (60–88%).
+- Rastrear concentración de amoníaco (ideal: 0–1 PPM).
+- Monitorear rendimiento del sistema de piso radiante.
+- Comparar temperatura interior contra la referencia exterior.
+- Monitorear estado operativo del ventilador y extractor.
+- Revisar tendencias de datos históricos usando el slider de línea de tiempo.
 
-## Visualization Purpose
+## Propósito de la Visualización
 
-The 3D volumetric heatmap provides a spatial representation of the temperature and humidity distribution across the entire room volume. The system supports toggling between temperature and humidity views. Using interpolation from the 5 sensor points, the system generates a continuous field that helps operators visually understand environmental conditions without checking each sensor individually.
+El mapa de calor volumétrico 3D provee una representación espacial de la distribución de temperatura y humedad en todo el volumen del cuarto. El sistema soporta cambio entre vistas de temperatura y humedad. Usando interpolación desde los 5 puntos de sensores, el sistema genera un campo continuo que ayuda a los operadores a entender visualmente las condiciones ambientales sin revisar cada sensor individualmente.
 
-The 3D render also includes a detailed wireframe of the room with inclined roof, windows, furniture, vintage lamps, planter, and a radiant floor system with serpentine heating pipes colored according to floor temperature.
+El render 3D también incluye un wireframe detallado del cuarto con techo inclinado, ventanas, mueble, lámparas vintage, jardinera y un sistema de piso radiante con tuberías de calefacción serpentín coloreadas según la temperatura del piso.

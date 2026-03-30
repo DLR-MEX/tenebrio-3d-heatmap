@@ -1,45 +1,45 @@
-# Real-Time 3D Room Temperature & Humidity Heatmap
+# Mapa de Calor 3D en Tiempo Real — Temperatura y Humedad
 
-A Python application that generates a real-time 3D volumetric heatmap of a mealworm breeding room using temperature and humidity data received from Ubidots via MQTT.
+Aplicación Python que genera un mapa de calor volumétrico 3D en tiempo real de un cuarto de cría de tenebrios, usando datos de temperatura y humedad recibidos desde Ubidots vía MQTT.
 
-## Project Overview
+## Descripción General
 
-This system monitors the internal temperature and humidity distribution of a Tenebrio molitor breeding room using 5 interior sensors and 1 exterior sensor. It produces an interactive 3D heatmap that updates in real time, allowing operators to detect thermal gradients, hot spots, and cold zones. The dashboard supports toggling between temperature and humidity views.
+Este sistema monitorea la distribución de temperatura y humedad interna de un cuarto de cría de Tenebrio molitor usando 5 sensores interiores y 1 sensor exterior. Produce un mapa de calor 3D interactivo que se actualiza en tiempo real, permitiendo a los operadores detectar gradientes térmicos, puntos calientes y zonas frías. El dashboard soporta cambio entre vistas de temperatura y humedad.
 
-## Features
+## Características
 
-- Real-time MQTT subscription to Ubidots IoT platform
-- 3D volumetric interpolation using scipy griddata (temperature and humidity)
-- Toggle between Temperature and Humidity 3D heatmap views
-- Interactive Plotly.js dashboard with isosurface rendering
-- Historical data viewer with timeline slider (fetches from Ubidots API)
-- Exterior temperature monitoring (tex sensor) with colored zone in 3D render
-- Average temperature indicators (superior/inferior)
-- Humidity monitoring (h1–h5, hum_general) with color-coded bars
-- Ammonia (PPM) monitoring with color-coded bar
-- Per-sensor vertical thermometer indicators with interpolated colors
-- Radiant floor system visualization (concrete slab, serpentine pipes, sensors)
-- Radiant floor temperature indicators (salida, medio piso)
-- Fan and extractor animated SVG widgets
-- Ideal range markers on temperature (23–28°C) and humidity (60–88%) bars
-- MQTT connection status and timestamp display
-- 3D wireframe: inclined roof, windows, furniture, vintage lamps, planter
-- Responsive design (desktop, tablet, mobile portrait and landscape)
-- Branded UI with TECHNEBRIOS and Ingenieria Condor logos
-- Orbitron font for timestamp display
-- Auto-refresh every 2 seconds
+- Suscripción MQTT en tiempo real a la plataforma IoT Ubidots
+- Interpolación volumétrica 3D con scipy griddata (temperatura y humedad)
+- Cambio entre vistas de Temperatura y Humedad en el render 3D
+- Dashboard interactivo Plotly.js con renderizado de isosuperficies
+- Visor de datos históricos con slider de línea de tiempo (consulta API de Ubidots)
+- Monitoreo de temperatura exterior (sensor tex) con zona coloreada en el render
+- Indicadores de temperatura promedio (superior/inferior)
+- Monitoreo de humedad (h1–h5, hum_general) con barras codificadas por color
+- Monitoreo de amoníaco (PPM) con barra codificada por color
+- Termómetros verticales por sensor con colores interpolados
+- Visualización del sistema de piso radiante (losa de concreto, tuberías serpentín, sensores)
+- Indicadores de temperatura del piso radiante (salida, medio piso)
+- Widgets SVG animados de ventilador y extractor
+- Marcas de rango ideal en barras de temperatura (23–28°C) y humedad (60–88%)
+- Estado de conexión MQTT y visualización de timestamp
+- Wireframe 3D: techo inclinado, ventanas, mueble, lámparas vintage, jardinera
+- Diseño responsivo (escritorio, tablet, móvil vertical y horizontal)
+- Interfaz con marca TECHNEBRIOS e Ingeniería Condor
+- Fuente Orbitron para visualización de fecha/hora
+- Actualización automática cada 2 segundos
 
-## System Architecture
+## Arquitectura del Sistema
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full architecture diagram and component descriptions.
+Ver [ARCHITECTURE.md](ARCHITECTURE.md) para el diagrama completo y descripción de componentes.
 
 ```
-Sensors → MQTT Client → Heatmap Engine → Flask API → Frontend (Plotly.js)
+Sensores → Cliente MQTT → Motor Heatmap → API Flask → Frontend (Plotly.js)
 ```
 
-## Installation
+## Instalación
 
-See [INSTALLATION.md](INSTALLATION.md) for detailed setup instructions.
+Ver [INSTALLATION.md](INSTALLATION.md) para instrucciones detalladas de configuración y despliegue en Raspberry Pi.
 
 ```bash
 pip install -r requirements.txt
@@ -48,33 +48,33 @@ python backend/main.py
 
 ## API
 
-See [API_REFERENCE.md](API_REFERENCE.md) for endpoint documentation.
+Ver [API_REFERENCE.md](API_REFERENCE.md) para documentación de endpoints.
 
-| Endpoint | Description |
+| Endpoint | Descripción |
 |----------|-------------|
-| `GET /` | Dashboard with 3D heatmap |
-| `GET /api/data` | JSON data for real-time visualization |
-| `GET /api/history` | Historical data from Ubidots |
-| `GET /api/history/interpolate` | Server-side interpolation for historical frames |
+| `GET /` | Dashboard con mapa de calor 3D |
+| `GET /api/data` | Datos JSON para visualización en tiempo real |
+| `GET /api/history` | Datos históricos desde Ubidots |
+| `GET /api/history/interpolate` | Interpolación del lado del servidor para frames históricos |
 
-## Project Structure
+## Estructura del Proyecto
 
 ```
 tenebrio-3d-heatmap/
 ├── backend/
-│   ├── config.py            # Configuration constants
-│   ├── main.py              # Application entry point
-│   ├── mqtt_client.py       # MQTT connection and payload parsing
-│   ├── heatmap_engine.py    # Temperature/humidity storage and 3D interpolation
-│   └── visualization.py     # Flask web server and API
+│   ├── config.py            # Constantes de configuración
+│   ├── main.py              # Punto de entrada de la aplicación
+│   ├── mqtt_client.py       # Conexión MQTT y parseo de payloads
+│   ├── heatmap_engine.py    # Almacenamiento temp/humedad e interpolación 3D
+│   └── visualization.py     # Servidor web Flask y API
 ├── templates/
-│   └── index.html           # Plotly.js 3D heatmap dashboard
+│   └── index.html           # Dashboard Plotly.js con mapa de calor 3D
 ├── static/
-│   └── CondorLogo.png       # Ingenieria Condor logo
+│   └── CondorLogo.png       # Logo Ingeniería Condor
 ├── tests/
 │   ├── test_interpolation.py
 │   └── test_mqtt_parser.py
-├── mqtt_simulator.py        # Local test data publisher
+├── mqtt_simulator.py        # Publicador de datos de prueba local
 ├── requirements.txt
 ├── ARCHITECTURE.md
 ├── SYSTEM_DESCRIPTION.md
@@ -83,20 +83,20 @@ tenebrio-3d-heatmap/
 └── README.md
 ```
 
-## Simulation Mode (Local Testing)
+## Modo Simulación (Pruebas Locales)
 
-For testing without a real Ubidots device, use the simulator with a local MQTT broker (e.g., Mosquitto):
+Para pruebas sin un dispositivo Ubidots real, usa el simulador con un broker MQTT local (ej. Mosquitto):
 
-1. Start your local broker (e.g., `mosquitto`).
-2. Update `backend/config.py`:
+1. Inicia tu broker local (ej. `mosquitto`).
+2. Actualiza `backend/config.py`:
    ```python
    MQTT_BROKER = "localhost"
    UBIDOTS_TOKEN = ""
    ```
-3. In one terminal: `python mqtt_simulator.py`
-4. In another terminal: `python backend/main.py`
+3. En una terminal: `python mqtt_simulator.py`
+4. En otra terminal: `python backend/main.py`
 
-## Running Tests
+## Ejecutar Tests
 
 ```bash
 pytest tests/ -v
