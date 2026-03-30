@@ -155,7 +155,7 @@ python backend/main.py
 
 Claude debe seguir estas reglas:
 
-- La documentación pública debe escribirse en inglés
+- La documentación pública debe escribirse en español comentarios, codigos en ingles o instrucciones de funciones.
 - Debe reflejar el funcionamiento real del sistema
 - No debe inventar funcionalidades inexistentes
 - Debe actualizarse cuando cambie la arquitectura
