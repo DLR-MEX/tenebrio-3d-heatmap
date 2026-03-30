@@ -22,6 +22,7 @@ MQTT Variables:
   Exterior:     tex (temperatura exterior)
   Averages:     tps (promedio superior), tpi (promedio inferior)
   Humidity:     h1, h2, h3, h4, h5, hum_general
+  Radiant:      temperatura1 (salida), temperatura3 (medio piso)
   Ammonia:      amoniaco (PPM)
   Devices:      ventilador, extractor (on/off)
 
@@ -42,6 +43,10 @@ The 3D scene includes:
   circular shades, and bulbs.
 - Planter + colored exterior zone at X=1..3, Y=6 (color = tex temp).
 - TEX sensor marker colored by temperature.
+- Radiant floor system (X=1..9, Y=0.5..5.5, Z=0..0.5):
+  concrete slab colored by floor temperature, serpentine heating pipes (red),
+  entry pipe (red) + return pipe (blue), reinforcement mesh, insulation layer,
+  2 temperature sensors (temperatura1=salida, temperatura3=medio piso).
 
 Side panel indicators:
 - 5 vertical thermometers (T1-T5) with ideal range marks (23-28°C).

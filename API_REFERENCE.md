@@ -65,7 +65,11 @@ Returns JSON data for the 3D heatmap visualization.
     "h5": 43.0,
     "hum_general": 38.0
   },
-  "amoniaco": 0.0
+  "amoniaco": 0.0,
+  "radiant_floor": {
+    "temperatura1": {"value": 18.5, "name": "Salida"},
+    "temperatura3": {"value": 19.1, "name": "Medio Piso"}
+  }
 }
 ```
 
@@ -91,6 +95,7 @@ Returns JSON data for the 3D heatmap visualization.
 | `tex_sensor` | object | Exterior sensor position and latest value. |
 | `humidity` | object | Per-sensor humidity values (h1–h5, hum_general). |
 | `amoniaco` | float or null | Latest ammonia sensor reading in PPM. |
+| `radiant_floor` | object | Radiant floor sensor values (temperatura1, temperatura3) with name and value. |
 
 ## GET /api/history
 

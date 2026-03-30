@@ -18,6 +18,8 @@ This system monitors the internal temperature and humidity distribution of a Ten
 - Humidity monitoring (h1–h5, hum_general) with color-coded bars
 - Ammonia (PPM) monitoring with color-coded bar
 - Per-sensor vertical thermometer indicators with interpolated colors
+- Radiant floor system visualization (concrete slab, serpentine pipes, sensors)
+- Radiant floor temperature indicators (salida, medio piso)
 - Fan and extractor animated SVG widgets
 - Ideal range markers on temperature (23–28°C) and humidity (60–88%) bars
 - MQTT connection status and timestamp display

@@ -45,6 +45,12 @@ EXTRACTOR_LABEL = "extractor"
 AVG_TEMP_SUPERIOR_LABEL = "tps"
 AVG_TEMP_INFERIOR_LABEL = "tpi"
 
+# Etiquetas de sensores del piso radiante
+RADIANT_FLOOR_LABELS = {
+    "temperatura1": "Salida",
+    "temperatura3": "Medio Piso",
+}
+
 # Etiquetas de sensores de humedad
 HUMIDITY_LABELS = ["h1", "h2", "h3", "h4", "h5", "hum_general"]
 

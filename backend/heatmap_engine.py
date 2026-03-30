@@ -37,6 +37,7 @@ class HeatmapEngine:
         self._avg_temp_inferior: Optional[float] = None
         self._humidity: dict[str, float] = {}
         self._ammonia_ppm: Optional[float] = None
+        self._radiant_floor: dict[str, float] = {}
         self._last_update: Optional[str] = None
 
         self._sensor_labels = list(config.SENSOR_POSITIONS.keys())
@@ -102,6 +103,11 @@ class HeatmapEngine:
             for label in config.HUMIDITY_LABELS:
                 if label in data:
                     self._humidity[label] = data[label]
+
+            # Sensores del piso radiante
+            for label in config.RADIANT_FLOOR_LABELS:
+                if label in data:
+                    self._radiant_floor[label] = data[label]
 
             # Sensor de amoníaco
             if config.AMMONIA_LABEL in data:
@@ -230,6 +236,10 @@ class HeatmapEngine:
     def get_ammonia_ppm(self) -> Optional[float]:
         with self._lock:
             return self._ammonia_ppm
+
+    def get_radiant_floor(self, label: str) -> Optional[float]:
+        with self._lock:
+            return self._radiant_floor.get(label)
 
     def get_last_update(self) -> Optional[str]:
         with self._lock:

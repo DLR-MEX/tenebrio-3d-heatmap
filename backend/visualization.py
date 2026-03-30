@@ -101,6 +101,14 @@ def api_data():
         },
         "amoniaco": round(_engine.get_ammonia_ppm(), 2)
         if _engine.get_ammonia_ppm() is not None else None,
+        "radiant_floor": {
+            label: {
+                "value": round(_engine.get_radiant_floor(label), 1)
+                if _engine.get_radiant_floor(label) is not None else None,
+                "name": desc,
+            }
+            for label, desc in config.RADIANT_FLOOR_LABELS.items()
+        },
         "last_update": _engine.get_last_update(),
     })
 

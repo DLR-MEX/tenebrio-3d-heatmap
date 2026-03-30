@@ -580,6 +580,29 @@
                     </div>
                 </div>
 
+                <!-- Piso radiante -->
+                <div class="indicators-section">
+                    <h2>Piso Radiante</h2>
+                    <div class="hbars-row">
+                        <div class="hbar-item">
+                            <div class="hbar-label">Salida</div>
+                            <div class="hbar-track-wrap">
+                                <div class="hbar-track"><div class="hbar-mark" style="left:42.9%" title="23°C"></div><div class="hbar-mark" style="left:66.7%" title="28°C"></div><div class="hbar-fill" id="hbar-fill-rf-t1"></div></div>
+                                <div class="hbar-scale"><span>14°</span><span>25°</span><span>35°</span></div>
+                            </div>
+                            <div class="hbar-value" id="hbar-val-rf-t1">--</div>
+                        </div>
+                        <div class="hbar-item">
+                            <div class="hbar-label">Medio Piso</div>
+                            <div class="hbar-track-wrap">
+                                <div class="hbar-track"><div class="hbar-mark" style="left:42.9%" title="23°C"></div><div class="hbar-mark" style="left:66.7%" title="28°C"></div><div class="hbar-fill" id="hbar-fill-rf-t3"></div></div>
+                                <div class="hbar-scale"><span>14°</span><span>25°</span><span>35°</span></div>
+                            </div>
+                            <div class="hbar-value" id="hbar-val-rf-t3">--</div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Dispositivos (ventilador y extractor) -->
                 <div class="indicators-section">
                     <h2>Dispositivos</h2>
@@ -970,6 +993,27 @@
                 }
             }
 
+            // Barras del piso radiante
+            if (data.radiant_floor) {
+                const rfMap = {'temperatura1': 'rf-t1', 'temperatura3': 'rf-t3'};
+                for (const [label, id] of Object.entries(rfMap)) {
+                    const rf = data.radiant_floor[label];
+                    const valEl = document.getElementById('hbar-val-' + id);
+                    const fillEl = document.getElementById('hbar-fill-' + id);
+                    if (!valEl || !fillEl || !rf) continue;
+                    if (rf.value !== null) {
+                        valEl.textContent = rf.value.toFixed(1) + ' °C';
+                        const pct = Math.max(0, Math.min(100,
+                            (rf.value - TEMP_BAR_MIN) / (TEMP_BAR_MAX - TEMP_BAR_MIN) * 100));
+                        fillEl.style.width = pct + '%';
+                        fillEl.style.background = tempColor(rf.value);
+                    } else {
+                        valEl.textContent = '-- °C';
+                        fillEl.style.width = '0%';
+                    }
+                }
+            }
+
             // Barra de amoníaco (rango 0-5 ppm para la barra)
             const AMMONIA_BAR_MAX = 5;
             const amValEl = document.getElementById('hbar-val-ammonia');
@@ -1268,7 +1312,168 @@
             // House wireframe
             const house = buildHouseStructure(data.x_range, data.y_range, data.z_range);
 
-            const traces = [...isoTraces, house, furnitureTrace, ...lampTraces, ...extZoneTraces, dropLines, markerTrace, nameTrace, valTrace];
+            // ---- Piso radiante ----
+            const radiantTraces = [];
+
+            // Losa de concreto — color según temperatura promedio del piso radiante
+            const slabX0 = 1, slabX1 = 9, slabY0 = 0.5, slabY1 = 5.5;
+            const slabZ0 = 0, slabZ1 = 0.5;
+            let slabColor = '#808080';
+            let slabHover = '<b>Losa de concreto</b><br>Piso radiante';
+            if (data.radiant_floor) {
+                const rfT3 = data.radiant_floor['temperatura3'];
+                const rfT1 = data.radiant_floor['temperatura1'];
+                const rfVals = [rfT3, rfT1].filter(v => v && v.value !== null).map(v => v.value);
+                if (rfVals.length > 0) {
+                    const avgTemp = rfVals.reduce((a, b) => a + b, 0) / rfVals.length;
+                    slabColor = tempColor(avgTemp);
+                    slabHover += '<br>Temp promedio: ' + avgTemp.toFixed(1) + '°C';
+                }
+            }
+            radiantTraces.push({
+                type: 'mesh3d',
+                x: [slabX0,slabX1,slabX1,slabX0, slabX0,slabX1,slabX1,slabX0],
+                y: [slabY0,slabY0,slabY1,slabY1, slabY0,slabY0,slabY1,slabY1],
+                z: [slabZ0,slabZ0,slabZ0,slabZ0, slabZ1,slabZ1,slabZ1,slabZ1],
+                i: [0,0, 0,0, 0,0, 4,4, 1,1, 3,3],
+                j: [1,2, 1,5, 3,7, 5,6, 2,6, 2,6],
+                k: [2,3, 5,4, 7,4, 6,7, 6,5, 6,7],
+                color: slabColor,
+                opacity: 0.45,
+                flatshading: true,
+                hovertemplate: slabHover + '<extra></extra>',
+                showlegend: false,
+            });
+
+            // Capa de aislamiento (amarilla, debajo de la losa)
+            radiantTraces.push({
+                type: 'mesh3d',
+                x: [slabX0,slabX1,slabX1,slabX0, slabX0,slabX1,slabX1,slabX0],
+                y: [slabY0,slabY0,slabY1,slabY1, slabY0,slabY0,slabY1,slabY1],
+                z: [slabZ0-0.08,slabZ0-0.08,slabZ0-0.08,slabZ0-0.08, slabZ0,slabZ0,slabZ0,slabZ0],
+                i: [0,0, 4,4],
+                j: [1,2, 5,6],
+                k: [2,3, 6,7],
+                color: '#C8A84E',
+                opacity: 0.3,
+                flatshading: true,
+                hovertemplate: '<b>Aislamiento térmico</b><extra></extra>',
+                showlegend: false,
+            });
+
+            // Tubería serpentín (rojo/naranja) dentro de la losa
+            const pipeX = [], pipeY = [], pipeZ = [];
+            const pipeZlevel = 0.25;
+            const nLoops = 8;
+            const pipeMargin = 0.5;
+            const loopSpacing = (slabY1 - slabY0 - 2 * pipeMargin) / nLoops;
+            for (let i = 0; i <= nLoops; i++) {
+                const y = slabY0 + pipeMargin + i * loopSpacing;
+                if (i % 2 === 0) {
+                    pipeX.push(slabX0 + pipeMargin); pipeY.push(y); pipeZ.push(pipeZlevel);
+                    pipeX.push(slabX1 - pipeMargin); pipeY.push(y); pipeZ.push(pipeZlevel);
+                } else {
+                    pipeX.push(slabX1 - pipeMargin); pipeY.push(y); pipeZ.push(pipeZlevel);
+                    pipeX.push(slabX0 + pipeMargin); pipeY.push(y); pipeZ.push(pipeZlevel);
+                }
+            }
+            radiantTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: pipeX, y: pipeY, z: pipeZ,
+                line: { color: '#E05020', width: 6 },
+                hovertemplate: '<b>Tubería calefacción</b><extra></extra>',
+                showlegend: false,
+            });
+
+            // Tubería de entrada (roja, sube desde la losa)
+            radiantTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: [pipeX[0], pipeX[0], pipeX[0]-0.3],
+                y: [pipeY[0], pipeY[0], pipeY[0]],
+                z: [pipeZlevel, 0.7, 0.7],
+                line: { color: '#CC3300', width: 5 },
+                hoverinfo: 'skip', showlegend: false,
+            });
+
+            // Tubería de retorno (azul, sale de la losa)
+            const lastIdx = pipeX.length - 1;
+            radiantTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: [pipeX[lastIdx], pipeX[lastIdx], pipeX[lastIdx]+0.3],
+                y: [pipeY[lastIdx], pipeY[lastIdx], pipeY[lastIdx]],
+                z: [pipeZlevel, 0.7, 0.7],
+                line: { color: '#2060CC', width: 5 },
+                hoverinfo: 'skip', showlegend: false,
+            });
+
+            // Sensores del piso radiante (temperatura1 = salida, temperatura3 = medio piso)
+            if (data.radiant_floor) {
+                // Sensor temperatura3 — Medio Piso (centro de la losa)
+                const t3rf = data.radiant_floor['temperatura3'];
+                const t3x = 5, t3y = 3, t3z = 0.5;
+                if (t3rf) {
+                    const t3val = t3rf.value !== null ? t3rf.value.toFixed(1) + '°C' : '--';
+                    const t3color = t3rf.value !== null ? tempColor(t3rf.value) : '#888';
+                    radiantTraces.push({
+                        type: 'scatter3d', mode: 'markers+text',
+                        x: [t3x], y: [t3y], z: [t3z + 0.15],
+                        marker: { size: 8, color: t3color, symbol: 'diamond',
+                                  line: { color: '#fff', width: 1 } },
+                        text: ['T3 Medio: ' + t3val],
+                        textposition: 'top center',
+                        textfont: { color: '#E8B830', size: 10, family: 'monospace' },
+                        hovertemplate: '<b>Medio Piso</b>: ' + t3val + '<extra></extra>',
+                        showlegend: false,
+                    });
+                    // Sonda metálica
+                    radiantTraces.push({
+                        type: 'scatter3d', mode: 'lines',
+                        x: [t3x, t3x], y: [t3y, t3y], z: [pipeZlevel, t3z + 0.15],
+                        line: { color: '#aaa', width: 3 },
+                        hoverinfo: 'skip', showlegend: false,
+                    });
+                }
+
+                // Sensor temperatura1 — Salida (junto a tubería de entrada)
+                const t1rf = data.radiant_floor['temperatura1'];
+                const t1x = pipeX[0] - 0.3, t1y = pipeY[0], t1z = 0.7;
+                if (t1rf) {
+                    const t1val = t1rf.value !== null ? t1rf.value.toFixed(1) + '°C' : '--';
+                    const t1color = t1rf.value !== null ? tempColor(t1rf.value) : '#888';
+                    radiantTraces.push({
+                        type: 'scatter3d', mode: 'markers+text',
+                        x: [t1x], y: [t1y], z: [t1z + 0.2],
+                        marker: { size: 7, color: t1color, symbol: 'diamond',
+                                  line: { color: '#fff', width: 1 } },
+                        text: ['T1 Salida: ' + t1val],
+                        textposition: 'top center',
+                        textfont: { color: '#E8B830', size: 10, family: 'monospace' },
+                        hovertemplate: '<b>Salida</b>: ' + t1val + '<extra></extra>',
+                        showlegend: false,
+                    });
+                }
+            }
+
+            // Malla de refuerzo (líneas grises cruzadas dentro de la losa)
+            const meshLines = { x: [], y: [], z: [] };
+            for (let mx = slabX0 + 1; mx < slabX1; mx += 1) {
+                meshLines.x.push(mx, mx, null);
+                meshLines.y.push(slabY0 + 0.3, slabY1 - 0.3, null);
+                meshLines.z.push(0.2, 0.2, null);
+            }
+            for (let my = slabY0 + 0.5; my < slabY1; my += 0.8) {
+                meshLines.x.push(slabX0 + 0.3, slabX1 - 0.3, null);
+                meshLines.y.push(my, my, null);
+                meshLines.z.push(0.2, 0.2, null);
+            }
+            radiantTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: meshLines.x, y: meshLines.y, z: meshLines.z,
+                line: { color: 'rgba(160,160,160,0.3)', width: 1 },
+                hoverinfo: 'skip', showlegend: false,
+            });
+
+            const traces = [...isoTraces, house, furnitureTrace, ...lampTraces, ...extZoneTraces, ...radiantTraces, dropLines, markerTrace, nameTrace, valTrace];
 
             const roofPeak = data.z_range[1] + 1.5;
             const layout = {
