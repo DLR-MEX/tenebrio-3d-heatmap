@@ -109,6 +109,14 @@ def api_data():
             }
             for label, desc in config.RADIANT_FLOOR_LABELS.items()
         },
+        "machine_room": {
+            label: {
+                "value": round(_engine.get_machine_room(label), 1)
+                if _engine.get_machine_room(label) is not None else None,
+                "name": desc,
+            }
+            for label, desc in config.MACHINE_ROOM_LABELS.items()
+        },
         "last_update": _engine.get_last_update(),
     })
 
@@ -143,19 +151,45 @@ def api_history():
         return jsonify({"error": "Parámetros start y end requeridos (YYYY-MM-DD)"}), 400
 
     try:
-        start_ms = int(datetime.strptime(start_date, "%Y-%m-%d").timestamp() * 1000)
-        end_ms = int(datetime.strptime(end_date, "%Y-%m-%d").timestamp() * 1000) + 86400000
+        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        end_dt = datetime.strptime(end_date, "%Y-%m-%d")
     except ValueError:
         return jsonify({"error": "Formato de fecha inválido, usar YYYY-MM-DD"}), 400
 
-    # Variables de temperatura y humedad
+    # Limitar a máximo 1 mes (31 días)
+    diff_days = (end_dt - start_dt).days
+    if diff_days > 31:
+        return jsonify({"error": "Rango máximo permitido: 31 días"}), 400
+    if diff_days < 0:
+        return jsonify({"error": "Fecha de inicio debe ser anterior a fecha de fin"}), 400
+
+    start_ms = int(start_dt.timestamp() * 1000)
+    end_ms = int(end_dt.timestamp() * 1000) + 86400000
+
+    # Todas las variables del sistema
     temp_vars = list(config.SENSOR_POSITIONS.keys())
-    hum_vars = ["h1", "h2", "h3", "h4", "h5"]
+    extra_temp_vars = [
+        config.EXTERIOR_TEMP_LABEL,
+        config.AVG_TEMP_SUPERIOR_LABEL,
+        config.AVG_TEMP_INFERIOR_LABEL,
+    ]
+    hum_vars = config.HUMIDITY_LABELS
+    radiant_vars = list(config.RADIANT_FLOOR_LABELS.keys())
+    machine_vars = list(config.MACHINE_ROOM_LABELS.keys())
+    other_vars = [config.AMMONIA_LABEL, config.FAN_LABEL, config.EXTRACTOR_LABEL]
 
-    result = {"timestamps": [], "temperature": {}, "humidity": {}}
+    result = {
+        "timestamps": [],
+        "temperature": {},
+        "humidity": {},
+        "radiant_floor": {},
+        "machine_room": {},
+        "other": {},
+    }
 
-    # Consultar cada variable
     all_timestamps = set()
+
+    # Consultar variables de temperatura interior
     for var in temp_vars:
         values = _fetch_ubidots_values(var, start_ms, end_ms)
         result["temperature"][var] = [
@@ -164,9 +198,46 @@ def api_history():
         for v in values:
             all_timestamps.add(v["timestamp"])
 
+    # Variables de temperatura extra (exterior, promedios)
+    for var in extra_temp_vars:
+        values = _fetch_ubidots_values(var, start_ms, end_ms)
+        result["temperature"][var] = [
+            {"timestamp": v["timestamp"], "value": v["value"]} for v in values
+        ]
+        for v in values:
+            all_timestamps.add(v["timestamp"])
+
+    # Humedad
     for var in hum_vars:
         values = _fetch_ubidots_values(var, start_ms, end_ms)
         result["humidity"][var] = [
+            {"timestamp": v["timestamp"], "value": v["value"]} for v in values
+        ]
+        for v in values:
+            all_timestamps.add(v["timestamp"])
+
+    # Piso radiante
+    for var in radiant_vars:
+        values = _fetch_ubidots_values(var, start_ms, end_ms)
+        result["radiant_floor"][var] = [
+            {"timestamp": v["timestamp"], "value": v["value"]} for v in values
+        ]
+        for v in values:
+            all_timestamps.add(v["timestamp"])
+
+    # Sala de máquinas
+    for var in machine_vars:
+        values = _fetch_ubidots_values(var, start_ms, end_ms)
+        result["machine_room"][var] = [
+            {"timestamp": v["timestamp"], "value": v["value"]} for v in values
+        ]
+        for v in values:
+            all_timestamps.add(v["timestamp"])
+
+    # Otras variables (amoníaco, ventilador, extractor)
+    for var in other_vars:
+        values = _fetch_ubidots_values(var, start_ms, end_ms)
+        result["other"][var] = [
             {"timestamp": v["timestamp"], "value": v["value"]} for v in values
         ]
         for v in values:

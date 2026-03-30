@@ -47,8 +47,15 @@ AVG_TEMP_INFERIOR_LABEL = "tpi"
 
 # Etiquetas de sensores del piso radiante
 RADIANT_FLOOR_LABELS = {
-    "temperatura1": "Salida",
+    "temperatura1": "Salida Piso",
     "temperatura3": "Medio Piso",
+}
+
+# Etiquetas de sensores de la sala de máquinas y solar
+MACHINE_ROOM_LABELS = {
+    "temperatura2": "Solar",
+    "temperatura4": "Entrada Cuarto",
+    "temperatura5": "Termo",
 }
 
 # Etiquetas de sensores de humedad

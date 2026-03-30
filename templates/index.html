@@ -415,6 +415,7 @@
                 <div class="mode-toggle">
                     <button id="btn-temp" class="active" onclick="setHeatmapMode('temp')">Temperatura</button>
                     <button id="btn-hum" onclick="setHeatmapMode('humidity')">Humedad</button>
+                    <button id="btn-floor" onclick="setHeatmapMode('floor')">Solo Piso</button>
                 </div>
                 <div class="history-panel">
                     <span class="hist-label">Historial:</span>
@@ -603,6 +604,37 @@
                     </div>
                 </div>
 
+                <!-- Sala de máquinas -->
+                <div class="indicators-section">
+                    <h2>Sala de Máquinas</h2>
+                    <div class="hbars-row">
+                        <div class="hbar-item">
+                            <div class="hbar-label">Calentador</div>
+                            <div class="hbar-track-wrap">
+                                <div class="hbar-track"><div class="hbar-fill" id="hbar-fill-mr-t2"></div></div>
+                                <div class="hbar-scale"><span>30°</span><span>45°</span><span>60°</span><span>75°</span><span>90°</span></div>
+                            </div>
+                            <div class="hbar-value" id="hbar-val-mr-t2">--</div>
+                        </div>
+                        <div class="hbar-item">
+                            <div class="hbar-label">Entrada</div>
+                            <div class="hbar-track-wrap">
+                                <div class="hbar-track"><div class="hbar-fill" id="hbar-fill-mr-t4"></div></div>
+                                <div class="hbar-scale"><span>14°</span><span>25°</span><span>35°</span></div>
+                            </div>
+                            <div class="hbar-value" id="hbar-val-mr-t4">--</div>
+                        </div>
+                        <div class="hbar-item">
+                            <div class="hbar-label">Termo</div>
+                            <div class="hbar-track-wrap">
+                                <div class="hbar-track"><div class="hbar-fill" id="hbar-fill-mr-t5"></div></div>
+                                <div class="hbar-scale"><span>15°</span><span>30°</span><span>50°</span><span>70°</span><span>90°</span></div>
+                            </div>
+                            <div class="hbar-value" id="hbar-val-mr-t5">--</div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Dispositivos (ventilador y extractor) -->
                 <div class="indicators-section">
                     <h2>Dispositivos</h2>
@@ -663,6 +695,7 @@
             heatmapMode = mode;
             document.getElementById('btn-temp').className = mode === 'temp' ? 'active' : '';
             document.getElementById('btn-hum').className = mode === 'humidity' ? 'active' : '';
+            document.getElementById('btn-floor').className = mode === 'floor' ? 'active' : '';
             plotInitialized = false;
             if (lastData) buildScene(lastData);
         }
@@ -685,6 +718,77 @@
         // ---------------------------------------------------------------
         // Wireframe de la casa: paredes + puerta en pared X=0 + techo inclinado
         // ---------------------------------------------------------------
+        // Genera un cilindro horizontal mesh3d (eje X) con tapas
+        function buildCylinderMesh(x0, x1, cy, cz, r, n, color, opacity, label) {
+            const vx = [], vy = [], vz = [];
+            const ti = [], tj = [], tk = [];
+            // Vértices: 2 anillos (izquierdo y derecho) + 2 centros de tapa
+            for (let ring = 0; ring < 2; ring++) {
+                const rx = ring === 0 ? x0 : x1;
+                for (let i = 0; i < n; i++) {
+                    const a = (i / n) * 2 * Math.PI;
+                    vx.push(rx);
+                    vy.push(cy + r * Math.cos(a));
+                    vz.push(cz + r * Math.sin(a));
+                }
+            }
+            // Centros de tapas
+            const cL = vx.length; vx.push(x0); vy.push(cy); vz.push(cz);
+            const cR = vx.length; vx.push(x1); vy.push(cy); vz.push(cz);
+            // Triángulos del cuerpo cilíndrico
+            for (let i = 0; i < n; i++) {
+                const i0 = i, i1 = (i + 1) % n;
+                const j0 = i + n, j1 = ((i + 1) % n) + n;
+                ti.push(i0, i0); tj.push(i1, j0); tk.push(j0, j1);
+                ti.push(i1); tj.push(j0); tk.push(j1);
+            }
+            // Tapas
+            for (let i = 0; i < n; i++) {
+                ti.push(cL); tj.push(i); tk.push((i + 1) % n);
+                ti.push(cR); tj.push(i + n); tk.push(((i + 1) % n) + n);
+            }
+            return {
+                type: 'mesh3d', x: vx, y: vy, z: vz,
+                i: ti, j: tj, k: tk,
+                color: color, opacity: opacity,
+                flatshading: true, showlegend: false,
+                hovertemplate: '<b>' + label + '</b><extra></extra>',
+            };
+        }
+
+        // Genera un cilindro vertical mesh3d (eje Z) con tapas
+        function buildVertCylinderMesh(cx, cy, z0, z1, r, n, color, opacity, label) {
+            const vx = [], vy = [], vz = [];
+            const ti = [], tj = [], tk = [];
+            for (let ring = 0; ring < 2; ring++) {
+                const rz = ring === 0 ? z0 : z1;
+                for (let i = 0; i < n; i++) {
+                    const a = (i / n) * 2 * Math.PI;
+                    vx.push(cx + r * Math.cos(a));
+                    vy.push(cy + r * Math.sin(a));
+                    vz.push(rz);
+                }
+            }
+            const cB = vx.length; vx.push(cx); vy.push(cy); vz.push(z0);
+            const cT = vx.length; vx.push(cx); vy.push(cy); vz.push(z1);
+            for (let i = 0; i < n; i++) {
+                const i0 = i, i1 = (i+1)%n, j0 = i+n, j1 = ((i+1)%n)+n;
+                ti.push(i0,i0); tj.push(i1,j0); tk.push(j0,j1);
+                ti.push(i1); tj.push(j0); tk.push(j1);
+            }
+            for (let i = 0; i < n; i++) {
+                ti.push(cB); tj.push(i); tk.push((i+1)%n);
+                ti.push(cT); tj.push(i+n); tk.push(((i+1)%n)+n);
+            }
+            return {
+                type: 'mesh3d', x: vx, y: vy, z: vz,
+                i: ti, j: tj, k: tk,
+                color: color, opacity: opacity,
+                flatshading: true, showlegend: false,
+                hovertemplate: '<b>' + label + '</b><extra></extra>',
+            };
+        }
+
         function buildHouseStructure(xr, yr, zr) {
             const [x0, x1] = xr;
             const [y0, y1] = yr;
@@ -902,6 +1006,18 @@
         }
 
         // Humedad: usa la misma HUMIDITY_COLORSCALE del render (0-100%)
+        // Escala de color para termo y calentador (15-90°C)
+        function termoScaleColor(value) {
+            const v = Math.max(15, Math.min(90, value));
+            let r, g, b;
+            if (v < 25) { r = 0; g = 60; b = 220; }
+            else if (v < 40) { const p = (v-25)/15; r = 0; g = Math.round(60+p*140); b = 220; }
+            else if (v < 55) { const p = (v-40)/15; r = 0; g = 200; b = Math.round(220-p*220); }
+            else if (v < 70) { const p = (v-55)/15; r = Math.round(p*255); g = Math.round(200-p*60); b = 0; }
+            else { const p = (v-70)/20; r = 220; g = Math.round(Math.max(40, 140-p*100)); b = 0; }
+            return `rgb(${r},${g},${b})`;
+        }
+
         function humidityColor(value) {
             const t = value / 100; // normalizar 0..1
             return interpolateColorscale(HUMIDITY_COLORSCALE, t);
@@ -993,6 +1109,77 @@
                 }
             }
 
+            // Barras de sala de máquinas
+            if (data.machine_room) {
+                // Entrada usa escala normal (14-35°C)
+                const mrNormal = {'temperatura4': 'mr-t4'};
+                for (const [label, id] of Object.entries(mrNormal)) {
+                    const mr = data.machine_room[label];
+                    const valEl = document.getElementById('hbar-val-' + id);
+                    const fillEl = document.getElementById('hbar-fill-' + id);
+                    if (!valEl || !fillEl || !mr) continue;
+                    if (mr.value !== null) {
+                        valEl.textContent = mr.value.toFixed(1) + ' °C';
+                        const pct = Math.max(0, Math.min(100,
+                            (mr.value - TEMP_BAR_MIN) / (TEMP_BAR_MAX - TEMP_BAR_MIN) * 100));
+                        fillEl.style.width = pct + '%';
+                        fillEl.style.background = tempColor(mr.value);
+                    } else {
+                        valEl.textContent = '-- °C';
+                        fillEl.style.width = '0%';
+                    }
+                }
+                // Calentador usa escala especial (30-90°C)
+                const t2mr = data.machine_room['temperatura2'];
+                const t2ValEl = document.getElementById('hbar-val-mr-t2');
+                const t2FillEl = document.getElementById('hbar-fill-mr-t2');
+                if (t2ValEl && t2FillEl && t2mr) {
+                    if (t2mr.value !== null) {
+                        t2ValEl.textContent = t2mr.value.toFixed(1) + ' °C';
+                        const pct = Math.max(0, Math.min(100,
+                            (t2mr.value - 30) / (90 - 30) * 100));
+                        t2FillEl.style.width = pct + '%';
+                        const cv = t2mr.value;
+                        let cColor;
+                        if (cv < 30) cColor = 'rgb(0,60,220)';
+                        else if (cv < 45) cColor = 'rgb(0,' + Math.round(60 + ((cv-30)/15)*140) + ',220)';
+                        else if (cv < 60) cColor = 'rgb(0,200,' + Math.round(220 - ((cv-45)/15)*220) + ')';
+                        else if (cv < 75) cColor = 'rgb(' + Math.round(((cv-60)/15)*255) + ',' + Math.round(200-((cv-60)/15)*60) + ',0)';
+                        else cColor = 'rgb(220,' + Math.round(140-((cv-75)/15)*100) + ',0)';
+                        t2FillEl.style.background = cColor;
+                    } else {
+                        t2ValEl.textContent = '-- °C';
+                        t2FillEl.style.width = '0%';
+                    }
+                }
+
+                // Termo usa escala especial (15-90°C)
+                const TERMO_MIN = 15, TERMO_MAX = 90;
+                const t5mr = data.machine_room['temperatura5'];
+                const t5ValEl = document.getElementById('hbar-val-mr-t5');
+                const t5FillEl = document.getElementById('hbar-fill-mr-t5');
+                if (t5ValEl && t5FillEl && t5mr) {
+                    if (t5mr.value !== null) {
+                        t5ValEl.textContent = t5mr.value.toFixed(1) + ' °C';
+                        const pct = Math.max(0, Math.min(100,
+                            (t5mr.value - TERMO_MIN) / (TERMO_MAX - TERMO_MIN) * 100));
+                        t5FillEl.style.width = pct + '%';
+                        // Color del termo: <25 azul, 25-45 cyan, 45-60 verde, 60-75 naranja, >75 rojo
+                        const tv = t5mr.value;
+                        let tColor;
+                        if (tv < 25) tColor = 'rgb(0,60,220)';
+                        else if (tv < 40) tColor = 'rgb(0,' + Math.round(60 + ((tv-25)/15)*140) + ',220)';
+                        else if (tv < 55) tColor = 'rgb(0,200,' + Math.round(220 - ((tv-40)/15)*220) + ')';
+                        else if (tv < 70) tColor = 'rgb(' + Math.round(((tv-55)/15)*255) + ',' + Math.round(200-((tv-55)/15)*60) + ',0)';
+                        else tColor = 'rgb(220,' + Math.round(Math.max(40, 140-((tv-70)/20)*100)) + ',0)';
+                        t5FillEl.style.background = tColor;
+                    } else {
+                        t5ValEl.textContent = '-- °C';
+                        t5FillEl.style.width = '0%';
+                    }
+                }
+            }
+
             // Barras del piso radiante
             if (data.radiant_floor) {
                 const rfMap = {'temperatura1': 'rf-t1', 'temperatura3': 'rf-t3'};
@@ -1053,10 +1240,11 @@
         function buildScene(data) {
             lastData = data;
 
-            // Seleccionar volumen según modo
+            // Seleccionar volumen según modo (floor = sin isosuperficies, solo piso radiante)
+            const isFloor = heatmapMode === 'floor';
             const isTemp = heatmapMode === 'temp';
-            const vol = isTemp ? data.volume_data : data.humidity_volume_data;
-            if (!vol) return;
+            const vol = isFloor ? null : (isTemp ? data.volume_data : data.humidity_volume_data);
+            if (!vol && !isFloor) return;
 
             const colorscale = isTemp ? TEMP_COLORSCALE : HUMIDITY_COLORSCALE;
             const cmin = isTemp ? data.vmin : 0;
@@ -1064,53 +1252,52 @@
             const unit = isTemp ? '°C' : '%';
             const labelType = isTemp ? 'Temp' : 'Hum';
 
-            // Rango real de datos para el volumen
-            let volMin = Infinity, volMax = -Infinity;
-            for (let i = 0; i < vol.value.length; i++) {
-                if (vol.value[i] < volMin) volMin = vol.value[i];
-                if (vol.value[i] > volMax) volMax = vol.value[i];
-            }
-
-            // Múltiples isosuperficies para llenar el cuarto con color
-            const nSlices = 5;
-            const step = (volMax - volMin) / nSlices;
+            // Isosuperficies (solo en modo temperatura o humedad, no en modo piso)
             const isoTraces = [];
-            for (let s = 0; s < nSlices; s++) {
-                const lo = volMin + s * step;
-                const hi = lo + step;
-                isoTraces.push({
-                    type: 'isosurface',
-                    x: vol.x, y: vol.y, z: vol.z,
-                    value: vol.value,
-                    isomin: lo,
-                    isomax: hi,
-                    surface: { show: true, count: 2 },
-                    caps: { x: {show: true}, y: {show: true}, z: {show: true} },
-                    colorscale: colorscale,
-                    cmin: cmin,
-                    cmax: cmax,
-                    opacity: 0.35,
-                    showscale: s === 0,
-                    colorbar: s === 0 ? {
-                        title: { text: unit, font: { color: '#8aa0b0', size: 14 } },
-                        tickfont: { color: '#8aa0b0', size: 11 },
-                        len: 0.6, thickness: 18,
-                    } : undefined,
-                    hovertemplate: 'X: %{x:.1f}m<br>Y: %{y:.1f}m<br>Z: %{z:.1f}m<br>' + labelType + ': %{value:.1f} ' + unit + '<extra></extra>',
-                });
+            if (!isFloor && vol) {
+                let volMin = Infinity, volMax = -Infinity;
+                for (let i = 0; i < vol.value.length; i++) {
+                    if (vol.value[i] < volMin) volMin = vol.value[i];
+                    if (vol.value[i] > volMax) volMax = vol.value[i];
+                }
+                const nSlices = 5;
+                const step = (volMax - volMin) / nSlices;
+                for (let s = 0; s < nSlices; s++) {
+                    const lo = volMin + s * step;
+                    const hi = lo + step;
+                    isoTraces.push({
+                        type: 'isosurface',
+                        x: vol.x, y: vol.y, z: vol.z,
+                        value: vol.value,
+                        isomin: lo,
+                        isomax: hi,
+                        surface: { show: true, count: 2 },
+                        caps: { x: {show: true}, y: {show: true}, z: {show: true} },
+                        colorscale: colorscale,
+                        cmin: cmin, cmax: cmax,
+                        opacity: 0.35,
+                        showscale: s === 0,
+                        colorbar: s === 0 ? {
+                            title: { text: unit, font: { color: '#8aa0b0', size: 14 } },
+                            tickfont: { color: '#8aa0b0', size: 11 },
+                            len: 0.6, thickness: 18,
+                        } : undefined,
+                        hovertemplate: 'X: %{x:.1f}m<br>Y: %{y:.1f}m<br>Z: %{z:.1f}m<br>' + labelType + ': %{value:.1f} ' + unit + '<extra></extra>',
+                    });
+                }
             }
 
             // Marcadores de sensores — cambian según modo temp/humedad
             const sx = [], sy = [], sz = [], sHover = [];
             const sensorKeys = Object.keys(data.sensors);
-            const humLabels = {'t1':'h1','t2':'h2','t3':'h3','t4':'h4','t5':'h5'};
+            const humLabelsMap = {'t1':'h1','t2':'h2','t3':'h3','t4':'h4','t5':'h5'};
             for (const [label, info] of Object.entries(data.sensors)) {
                 sx.push(info.x); sy.push(info.y); sz.push(info.z);
                 if (isTemp) {
                     const val = info.value !== null ? info.value.toFixed(1) + ' °C' : '--';
                     sHover.push('<b>' + label + '</b>: ' + val + '<br>Z: ' + info.z.toFixed(1) + 'm');
                 } else {
-                    const hKey = humLabels[label];
+                    const hKey = humLabelsMap[label];
                     const hVal = hKey && data.humidity[hKey] !== null ? data.humidity[hKey].toFixed(1) + ' %' : '--';
                     sHover.push('<b>' + (hKey || label) + '</b>: ' + hVal + '<br>Z: ' + info.z.toFixed(1) + 'm');
                 }
@@ -1119,18 +1306,26 @@
                 const tex = data.tex_sensor;
                 sx.push(tex.x); sy.push(tex.y); sz.push(tex.z);
                 const texVal = tex.value !== null ? tex.value.toFixed(1) + ' °C' : '--';
-                sHover.push('<b>tex (ext)</b>: ' + texVal + '<br>Z: ' + tex.z.toFixed(1) + 'm');
+                sHover.push('<b>EXTERIOR</b>: ' + texVal + '<br>Z: ' + tex.z.toFixed(1) + 'm');
             }
 
-            // Colores individuales por marcador: blanco para interiores, color de temperatura para tex
+            // Colores individuales: diamantes coloreados por temperatura para todos los sensores
             const markerColors = [];
             for (const [label, info] of Object.entries(data.sensors)) {
-                markerColors.push('#ffffff');
+                if (isTemp && info.value !== null) {
+                    markerColors.push(tempColor(info.value));
+                } else if (!isTemp) {
+                    const hk = humLabelsMap[label];
+                    const hv = hk && data.humidity[hk] !== null ? data.humidity[hk] : null;
+                    markerColors.push(hv !== null ? humidityColor(hv) : '#888');
+                } else {
+                    markerColors.push('#888');
+                }
             }
             if (data.tex_sensor && data.tex_sensor.value !== null) {
                 markerColors.push(tempColor(data.tex_sensor.value));
             } else if (data.tex_sensor) {
-                markerColors.push('#ffffff');
+                markerColors.push('#888');
             }
 
             const markerTrace = {
@@ -1138,8 +1333,8 @@
                 x: sx, y: sy, z: sz,
                 customdata: sHover,
                 marker: {
-                    size: 7, color: markerColors,
-                    line: { color: '#000', width: 1.5 }, symbol: 'circle',
+                    size: 8, color: markerColors,
+                    line: { color: '#fff', width: 1.5 }, symbol: 'diamond',
                 },
                 hovertemplate: '%{customdata}<extra></extra>',
                 showlegend: false,
@@ -1257,9 +1452,9 @@
             // Etiquetas de nombre de sensores — cambian según modo
             const nameTexts = [];
             for (const label of Object.keys(data.sensors)) {
-                nameTexts.push(isTemp ? label : (humLabels[label] || label));
+                nameTexts.push(isTemp ? label : (humLabelsMap[label] || label));
             }
-            if (data.tex_sensor) nameTexts.push('tex');
+            if (data.tex_sensor) nameTexts.push('EXTERIOR');
 
             const nameTrace = {
                 type: 'scatter3d', mode: 'text',
@@ -1276,7 +1471,7 @@
                 if (isTemp) {
                     valTexts.push(info.value !== null ? info.value.toFixed(1) + ' °C' : '--');
                 } else {
-                    const hKey = humLabels[label];
+                    const hKey = humLabelsMap[label];
                     const hVal = hKey && data.humidity[hKey] !== null ? data.humidity[hKey].toFixed(1) + ' %' : '--';
                     valTexts.push(hVal);
                 }
@@ -1385,24 +1580,36 @@
                 showlegend: false,
             });
 
-            // Tubería de entrada (roja, sube desde la losa)
+            // Derivación roja del serpentín hacia V2 (centro X=1, Y=3)
+            // Buscar el punto más cercano a Y=3 en la serpentina para la derivación
+            radiantTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: [slabX0 + pipeMargin, slabX0 + pipeMargin, 0.5],
+                y: [3, 3, 3],
+                z: [pipeZlevel, 0.5, 0.5],
+                line: { color: '#E05020', width: 4 },
+                hovertemplate: '<b>Derivación serpentín → V2</b><extra></extra>',
+                showlegend: false,
+            });
+
+            // Tubería de entrada (roja, sube desde la losa a nivel 0.5)
             radiantTraces.push({
                 type: 'scatter3d', mode: 'lines',
                 x: [pipeX[0], pipeX[0], pipeX[0]-0.3],
                 y: [pipeY[0], pipeY[0], pipeY[0]],
-                z: [pipeZlevel, 0.7, 0.7],
+                z: [pipeZlevel, 0.5, 0.5],
                 line: { color: '#CC3300', width: 5 },
                 hoverinfo: 'skip', showlegend: false,
             });
 
-            // Tubería de retorno (azul, sale de la losa)
+            // Tubería de retorno (gris, sale de la losa hacia la pared)
             const lastIdx = pipeX.length - 1;
             radiantTraces.push({
                 type: 'scatter3d', mode: 'lines',
                 x: [pipeX[lastIdx], pipeX[lastIdx], pipeX[lastIdx]+0.3],
                 y: [pipeY[lastIdx], pipeY[lastIdx], pipeY[lastIdx]],
-                z: [pipeZlevel, 0.7, 0.7],
-                line: { color: '#2060CC', width: 5 },
+                z: [pipeZlevel, 0.5, 0.5],
+                line: { color: '#999', width: 5 },
                 hoverinfo: 'skip', showlegend: false,
             });
 
@@ -1434,9 +1641,9 @@
                     });
                 }
 
-                // Sensor temperatura1 — Salida (junto a tubería de entrada)
+                // Sensor temperatura1 — Salida (junto a tubería gris de retorno)
                 const t1rf = data.radiant_floor['temperatura1'];
-                const t1x = pipeX[0] - 0.3, t1y = pipeY[0], t1z = 0.7;
+                const t1x = pipeX[pipeX.length-1] + 0.3, t1y = pipeY[pipeY.length-1], t1z = 0.5;
                 if (t1rf) {
                     const t1val = t1rf.value !== null ? t1rf.value.toFixed(1) + '°C' : '--';
                     const t1color = t1rf.value !== null ? tempColor(t1rf.value) : '#888';
@@ -1473,7 +1680,484 @@
                 hoverinfo: 'skip', showlegend: false,
             });
 
-            const traces = [...isoTraces, house, furnitureTrace, ...lampTraces, ...extZoneTraces, ...radiantTraces, dropLines, markerTrace, nameTrace, valTrace];
+            // ---- Sala de máquinas (adyacente al cuarto principal, X=10..16) ----
+            const machineTraces = [];
+            const mrX0 = -8, mrX1 = -2, mrY0 = 0, mrY1 = 6, mrZ0 = 0, mrZ1 = 3;
+
+            // Wireframe de la sala de máquinas
+            const mrSegs = [];
+            function mrEdge(a, b) { mrSegs.push(a, b, null); }
+            mrEdge([mrX0,mrY0,mrZ0],[mrX1,mrY0,mrZ0]); mrEdge([mrX1,mrY0,mrZ0],[mrX1,mrY1,mrZ0]);
+            mrEdge([mrX1,mrY1,mrZ0],[mrX0,mrY1,mrZ0]); mrEdge([mrX0,mrY1,mrZ0],[mrX0,mrY0,mrZ0]);
+            mrEdge([mrX0,mrY0,mrZ1],[mrX1,mrY0,mrZ1]); mrEdge([mrX1,mrY0,mrZ1],[mrX1,mrY1,mrZ1]);
+            mrEdge([mrX1,mrY1,mrZ1],[mrX0,mrY1,mrZ1]); mrEdge([mrX0,mrY1,mrZ1],[mrX0,mrY0,mrZ1]);
+            // Pilares (4 esquinas para cerrar las paredes)
+            mrEdge([mrX0,mrY0,mrZ0],[mrX0,mrY0,mrZ1]); mrEdge([mrX0,mrY1,mrZ0],[mrX0,mrY1,mrZ1]);
+            mrEdge([mrX1,mrY0,mrZ0],[mrX1,mrY0,mrZ1]); mrEdge([mrX1,mrY1,mrZ0],[mrX1,mrY1,mrZ1]);
+            const mrRx = [], mrRy = [], mrRz = [];
+            for (const p of mrSegs) {
+                if (p === null) { mrRx.push(null); mrRy.push(null); mrRz.push(null); }
+                else { mrRx.push(p[0]); mrRy.push(p[1]); mrRz.push(p[2]); }
+            }
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: mrRx, y: mrRy, z: mrRz,
+                line: { color: 'rgba(180,200,220,0.4)', width: 2 },
+                hoverinfo: 'skip', showlegend: false,
+            });
+
+            // Corredor techado entre sala de máquinas y cuarto principal (X=-2..0)
+            const corSegs = [];
+            function corEdge(a, b) { corSegs.push(a, b, null); }
+            const corX0 = -2, corX1 = 0, corZ1 = 2.5;
+            // Piso
+            corEdge([corX0,mrY0,mrZ0],[corX1,mrY0,mrZ0]); corEdge([corX1,mrY0,mrZ0],[corX1,mrY1,mrZ0]);
+            corEdge([corX1,mrY1,mrZ0],[corX0,mrY1,mrZ0]); corEdge([corX0,mrY1,mrZ0],[corX0,mrY0,mrZ0]);
+            // Techito
+            corEdge([corX0,mrY0,corZ1],[corX1,mrY0,corZ1]); corEdge([corX1,mrY0,corZ1],[corX1,mrY1,corZ1]);
+            corEdge([corX1,mrY1,corZ1],[corX0,mrY1,corZ1]); corEdge([corX0,mrY1,corZ1],[corX0,mrY0,corZ1]);
+            // Pilares del corredor
+            corEdge([corX0,mrY0,mrZ0],[corX0,mrY0,corZ1]); corEdge([corX1,mrY0,mrZ0],[corX1,mrY0,corZ1]);
+            corEdge([corX0,mrY1,mrZ0],[corX0,mrY1,corZ1]); corEdge([corX1,mrY1,mrZ0],[corX1,mrY1,corZ1]);
+            const corRx = [], corRy = [], corRz = [];
+            for (const p of corSegs) {
+                if (p === null) { corRx.push(null); corRy.push(null); corRz.push(null); }
+                else { corRx.push(p[0]); corRy.push(p[1]); corRz.push(p[2]); }
+            }
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: corRx, y: corRy, z: corRz,
+                line: { color: 'rgba(180,200,220,0.35)', width: 2 },
+                hoverinfo: 'skip', showlegend: false,
+            });
+
+            // Rotoplas (depósito de agua fría) — wireframe consolidado en 1 trace
+            const rpX = -5, rpY = 3, rpR = 0.6, rpZ0 = 0, rpZ1 = 1.8;
+            const rpN = 12;
+            const rpWx = [], rpWy = [], rpWz = [];
+            // Círculo inferior + superior + verticales en un solo trace
+            for (let i = 0; i <= rpN; i++) {
+                const a = (i / rpN) * 2 * Math.PI;
+                rpWx.push(rpX + rpR * Math.cos(a)); rpWy.push(rpY + rpR * Math.sin(a)); rpWz.push(rpZ0);
+            }
+            rpWx.push(null); rpWy.push(null); rpWz.push(null);
+            for (let i = 0; i <= rpN; i++) {
+                const a = (i / rpN) * 2 * Math.PI;
+                rpWx.push(rpX + rpR * Math.cos(a)); rpWy.push(rpY + rpR * Math.sin(a)); rpWz.push(rpZ1);
+            }
+            for (let i = 0; i < rpN; i += 3) {
+                const a = (i / rpN) * 2 * Math.PI;
+                rpWx.push(null, rpX + rpR * Math.cos(a), rpX + rpR * Math.cos(a));
+                rpWy.push(null, rpY + rpR * Math.sin(a), rpY + rpR * Math.sin(a));
+                rpWz.push(null, rpZ0, rpZ1);
+            }
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: rpWx, y: rpWy, z: rpWz,
+                line: { color: '#777', width: 2 },
+                hoverinfo: 'skip', showlegend: false,
+            });
+            // Cuerpo sólido cilíndrico del rotoplas — color según sensor Salida (temperatura1)
+            let rpColor = '#666';
+            if (data.radiant_floor && data.radiant_floor['temperatura1'] && data.radiant_floor['temperatura1'].value !== null) {
+                rpColor = tempColor(data.radiant_floor['temperatura1'].value);
+            }
+            machineTraces.push(buildVertCylinderMesh(
+                rpX, rpY, rpZ0, rpZ1, rpR, 12,
+                rpColor, 0.4, 'Rotoplas (Agua Fría)'
+            ));
+
+            // Bomba M2 dentro del rotoplas — marcador con forma de bomba
+            machineTraces.push({
+                type: 'scatter3d', mode: 'markers+text',
+                x: [rpX], y: [rpY], z: [0.5],
+                marker: { size: 12, color: '#444', symbol: 'circle',
+                          line: { color: '#E8B830', width: 2 } },
+                text: ['M2'], textposition: 'top center',
+                textfont: { color: '#E8B830', size: 9, family: 'monospace' },
+                hovertemplate: '<b>Bomba M2</b><extra></extra>',
+                showlegend: false,
+            });
+
+            // Calentador solar — panel inclinado + cilindro interno sobre el techo
+            const solX0 = -7.5, solX1 = -3.5, solY = 3, solZbase = mrZ1 + 0.1;
+            let solarColor = '#2266AA';
+            if (data.machine_room && data.machine_room['temperatura2'] && data.machine_room['temperatura2'].value !== null) {
+                solarColor = termoScaleColor(data.machine_room['temperatura2'].value);
+            }
+            // Tanque cilíndrico horizontal del calentador solar (eje X)
+            const solCylX0 = solX0 + 0.3, solCylX1 = solX1 - 0.3, solCylR = 0.3;
+            const solCylZ = solZbase + 0.8;
+            const solCylN = 12;
+            // Wireframe del tanque solar consolidado (tapas + longitudinales en 1 trace)
+            const solWx = [], solWy = [], solWz = [];
+            for (const cx of [solCylX0, solCylX1]) {
+                if (solWx.length) { solWx.push(null); solWy.push(null); solWz.push(null); }
+                for (let i = 0; i <= solCylN; i++) {
+                    const a = (i / solCylN) * 2 * Math.PI;
+                    solWx.push(cx); solWy.push(solY + solCylR * Math.cos(a)); solWz.push(solCylZ + solCylR * Math.sin(a));
+                }
+            }
+            for (let i = 0; i < solCylN; i += 2) {
+                const a = (i / solCylN) * 2 * Math.PI;
+                solWx.push(null, solCylX0, solCylX1);
+                solWy.push(null, solY + solCylR * Math.cos(a), solY + solCylR * Math.cos(a));
+                solWz.push(null, solCylZ + solCylR * Math.sin(a), solCylZ + solCylR * Math.sin(a));
+            }
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: solWx, y: solWy, z: solWz,
+                line: { color: solarColor, width: 2 },
+                hoverinfo: 'skip', showlegend: false,
+            });
+            // Cuerpo sólido cilíndrico del tanque solar
+            machineTraces.push(buildCylinderMesh(
+                solCylX0, solCylX1, solY, solCylZ, solCylR, 12,
+                solarColor, 0.45, 'Tanque solar'
+            ));
+
+            // Patas + barras del tanque consolidadas en 1 trace
+            const tankLegX = [solCylX0 + 0.3, solCylX1 - 0.3];
+            const tankLegY = [solY - solCylR - 0.05, solY + solCylR + 0.05];
+            const legWx = [], legWy = [], legWz = [];
+            for (const lx of tankLegX) {
+                for (const ly of tankLegY) {
+                    legWx.push(null, lx, lx); legWy.push(null, ly, ly); legWz.push(null, solZbase, solCylZ - solCylR);
+                }
+                legWx.push(null, lx, lx); legWy.push(null, tankLegY[0], tankLegY[1]); legWz.push(null, solCylZ-solCylR, solCylZ-solCylR);
+            }
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: legWx, y: legWy, z: legWz,
+                line: { color: '#888', width: 2 },
+                hoverinfo: 'skip', showlegend: false,
+            });
+
+            // Panel inclinado rotado 90° (ahora en eje X, pegado al tanque en Y+)
+            // El panel va desde el tanque (arriba) inclinado hacia abajo en Y
+            const panelLen = 2.0; // largo del panel
+            const panelYtop = solY + solCylR + 0.05; // pegado al tanque
+            const panelYbot = panelYtop + panelLen; // extremo inferior alejado
+            const panelZtop = solCylZ - solCylR; // arriba, al fondo del tanque
+            const panelZbot = solZbase; // abajo, en el techo
+            // Wireframe del panel inclinado
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: [solCylX0, solCylX1, solCylX1, solCylX0, solCylX0],
+                y: [panelYtop, panelYtop, panelYbot, panelYbot, panelYtop],
+                z: [panelZtop, panelZtop, panelZbot, panelZbot, panelZtop],
+                line: { color: solarColor, width: 4 },
+                hoverinfo: 'skip', showlegend: false,
+            });
+            // Panel sólido
+            machineTraces.push({
+                type: 'mesh3d',
+                x: [solCylX0, solCylX1, solCylX1, solCylX0],
+                y: [panelYtop, panelYtop, panelYbot, panelYbot],
+                z: [panelZtop, panelZtop, panelZbot, panelZbot],
+                i: [0, 0], j: [1, 2], k: [2, 3],
+                color: solarColor, opacity: 0.5,
+                flatshading: true, showlegend: false,
+                hovertemplate: '<b>Panel Solar</b><extra></extra>',
+            });
+            // Tubos del panel consolidados en 1 trace
+            const tubeWx = [], tubeWy = [], tubeWz = [];
+            for (let tx = solCylX0 + 0.2; tx <= solCylX1 - 0.1; tx += 0.3) {
+                tubeWx.push(null, tx, tx);
+                tubeWy.push(null, panelYtop + 0.1, panelYbot - 0.1);
+                tubeWz.push(null, panelZtop - 0.02, panelZbot + 0.02);
+            }
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: tubeWx, y: tubeWy, z: tubeWz,
+                line: { color: '#CC4400', width: 2 },
+                hoverinfo: 'skip', showlegend: false,
+            });
+
+            // Termo (depósito agua caliente) — cilindro horizontal acostado, color según temperatura
+            const tX0 = -7, tX1 = -3.5, tY = 1, tR = 0.5, tZ = 0.6;
+            const tN = 12;
+            // Color del termo según sensor temperatura5
+            let termoColor = '#3377AA';
+            if (data.machine_room && data.machine_room['temperatura5'] && data.machine_room['temperatura5'].value !== null) {
+                termoColor = termoScaleColor(data.machine_room['temperatura5'].value);
+            }
+            // Wireframe del termo consolidado (tapas + longitudinales + soportes en 1 trace)
+            const tWx = [], tWy = [], tWz = [];
+            for (const tx of [tX0, tX1]) {
+                if (tWx.length) { tWx.push(null); tWy.push(null); tWz.push(null); }
+                for (let i = 0; i <= tN; i++) {
+                    const a = (i / tN) * 2 * Math.PI;
+                    tWx.push(tx); tWy.push(tY + tR * Math.cos(a)); tWz.push(tZ + tR + tR * Math.sin(a));
+                }
+            }
+            for (let i = 0; i < tN; i += 2) {
+                const a = (i / tN) * 2 * Math.PI;
+                tWx.push(null, tX0, tX1);
+                tWy.push(null, tY + tR * Math.cos(a), tY + tR * Math.cos(a));
+                tWz.push(null, tZ + tR + tR * Math.sin(a), tZ + tR + tR * Math.sin(a));
+            }
+            // Soportes U invertida
+            const tSupX1 = tX0 + 0.5, tSupX2 = tX1 - 0.5;
+            for (const sx of [tSupX1, tSupX2]) {
+                tWx.push(null, sx, sx, sx, sx, sx);
+                tWy.push(null, tY-tR-0.1, tY-tR-0.1, tY-tR-0.1, tY+tR+0.1, tY+tR+0.1);
+                tWz.push(null, 0, tZ, tZ+tR, tZ, 0);
+            }
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: tWx, y: tWy, z: tWz,
+                line: { color: termoColor, width: 2 },
+                hoverinfo: 'skip', showlegend: false,
+            });
+            // Cuerpo sólido cilíndrico del termo coloreado por temperatura
+            machineTraces.push(buildCylinderMesh(
+                tX0, tX1, tY, tZ + tR, tR, 12,
+                termoColor, 0.45, 'Termo (Agua Caliente)'
+            ));
+
+            // ---- Tuberías de conexión (flujo del circuito hidráulico) ----
+            const pipeStart = { x: pipeX[0], y: pipeY[0], z: pipeZlevel };
+            const pipeEnd = { x: pipeX[pipeX.length-1], y: pipeY[pipeY.length-1], z: pipeZlevel };
+
+            // Ambas válvulas en paralelo sobre la línea azul (termo → piso radiante)
+            // Bifurcación: la línea azul se divide en 2 ramas con V1 y V2, se unen al piso
+
+            // 1. Retorno: serpentina → pared → sube → cruza corredor → baja al rotoplas (90°)
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: [pipeEnd.x+0.3, 0.3, 0.3, 0.3, 0.3, -1, -1, -2, -2, rpX, rpX],
+                y: [pipeEnd.y, pipeEnd.y, pipeEnd.y, pipeEnd.y, pipeEnd.y, pipeEnd.y, rpY, rpY, rpY, rpY, rpY],
+                z: [0.5, 0.5, 0.5, 2.4, 2.4, 2.4, 2.4, 2.4, 2.4, 2.4, rpZ1],
+                line: { color: '#999', width: 5 },
+                hovertemplate: '<b>Retorno → Rotoplas</b><extra></extra>',
+                showlegend: false,
+            });
+
+            // 2. Bomba saca por costado del rotoplas → sube vertical → horizontal al solar (90°)
+            const bombaSalidaX = rpX + rpR;
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: [bombaSalidaX, bombaSalidaX, bombaSalidaX, bombaSalidaX, solCylX0, solCylX0],
+                y: [rpY, rpY, rpY, rpY, rpY, solY],
+                z: [0.3, 0.3, mrZ1 + 0.1, mrZ1 + 0.1, mrZ1 + 0.1, solCylZ],
+                line: { color: '#CC6600', width: 4 },
+                hovertemplate: '<b>Bomba → Solar</b><extra></extra>',
+                showlegend: false,
+            });
+
+            // 3. Solar → baja vertical → horizontal al termo (tapa derecha, 90°)
+            const termoCenterZ = tZ + tR;
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: [solCylX1, solCylX1, tX1 + 0.3, tX1 + 0.3, tX1],
+                y: [solY, solY, solY, tY, tY],
+                z: [solCylZ, termoCenterZ, termoCenterZ, termoCenterZ, termoCenterZ],
+                line: { color: '#CC4400', width: 4 },
+                hovertemplate: '<b>Solar → Termo</b><extra></extra>',
+                showlegend: false,
+            });
+
+            // Tapas de tubería del termo consolidadas (2 círculos en 1 trace + 2 marcadores en 1)
+            const tapaN = 10, tapaR = 0.15;
+            const tapWx = [], tapWy = [], tapWz = [];
+            for (const tapX of [tX0, tX1]) {
+                if (tapWx.length) { tapWx.push(null); tapWy.push(null); tapWz.push(null); }
+                for (let i = 0; i <= tapaN; i++) {
+                    const a = (i / tapaN) * 2 * Math.PI;
+                    tapWx.push(tapX); tapWy.push(tY + tapaR * Math.cos(a)); tapWz.push(termoCenterZ + tapaR * Math.sin(a));
+                }
+            }
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: tapWx, y: tapWy, z: tapWz,
+                line: { color: '#ddd', width: 3 },
+                hoverinfo: 'skip', showlegend: false,
+            });
+            machineTraces.push({
+                type: 'scatter3d', mode: 'markers',
+                x: [tX0, tX1], y: [tY, tY], z: [termoCenterZ, termoCenterZ],
+                marker: { size: 5, color: '#ccc', line: { color: '#999', width: 1 } },
+                hoverinfo: 'skip', showlegend: false,
+            });
+
+            // 4. Termo → sube vertical → horizontal cruza corredor → baja al piso (90°)
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: [tX0, tX0, tX0, -2, -2, -1, -1, 0.3, 0.3, 0.3],
+                y: [tY, tY, 3, 3, 3, 3, 3, 3, 3, 3],
+                z: [termoCenterZ, 2.3, 2.3, 2.3, 2.3, 2.3, 2.3, 2.3, 2.3, 0.5],
+                line: { color: '#4488BB', width: 5 },
+                hovertemplate: '<b>Termo → Entrada piso</b><extra></extra>',
+                showlegend: false,
+            });
+
+            // Tubería a nivel del piso: borde X=0.3 → punto de conexión X=1, Y=3
+            const conX = 0.5, conY = 3, conZ = 0.5; // punto de conexión en el piso
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: [0.3, conX],
+                y: [3, conY],
+                z: [0.5, conZ],
+                line: { color: '#4488BB', width: 5 },
+                hovertemplate: '<b>Tubería nivel piso</b><extra></extra>',
+                showlegend: false,
+            });
+
+            // "H" de distribución: tubería azul llega → se divide en V1 y V2 a nivel 0.5
+            const vZ = 0.5;
+            // V1 a la izquierda (Y=pipeStart.y, conecta con tubería roja de entrada)
+            const v1X = conX, v1Y = pipeStart.y, v1Z = vZ;
+            // V2 al centro (Y=3, conecta con derivación roja del serpentín)
+            const v2X = conX, v2Y = 3, v2Z = vZ;
+
+            // Tronco vertical de la H: azul baja de 2.3 a nivel 0.5
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: [conX, conX],
+                y: [conY, conY],
+                z: [conZ, vZ],
+                line: { color: '#4488BB', width: 5 },
+                hoverinfo: 'skip', showlegend: false,
+            });
+
+            // Barra horizontal de la H: conecta V1 y V2 (a Z=0.5)
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: [v1X, v2X],
+                y: [v1Y, v2Y],
+                z: [vZ, vZ],
+                line: { color: '#4488BB', width: 5 },
+                hovertemplate: '<b>Distribuidor</b><extra></extra>',
+                showlegend: false,
+            });
+
+            // V1 → sale en X hacia la tubería roja de entrada a Z=0.5 (ángulo 90°)
+            machineTraces.push({
+                type: 'scatter3d', mode: 'lines',
+                x: [v1X, pipeX[0] - 0.3],
+                y: [v1Y, pipeY[0]],
+                z: [0.5, 0.5],
+                line: { color: '#4488BB', width: 4 },
+                hovertemplate: '<b>V1 → Entrada</b><extra></extra>',
+                showlegend: false,
+            });
+
+            // V2 ya está conectada con la derivación roja que llega a (1, 3, 0.5)
+
+            // Marcadores V1 y V2
+            machineTraces.push({
+                type: 'scatter3d', mode: 'markers+text',
+                x: [v1X, v2X],
+                y: [v1Y, v2Y],
+                z: [v1Z, v2Z],
+                marker: { size: 8, color: '#aaa', symbol: 'diamond',
+                          line: { color: '#E8B830', width: 2 } },
+                text: ['V1', 'V2'], textposition: 'top center',
+                textfont: { color: '#E8B830', size: 9, family: 'monospace' },
+                hovertemplate: '<b>Válvula</b><extra></extra>',
+                showlegend: false,
+            });
+
+            // Sensores de sala de máquinas con líneas de conexión a sus equipos
+            if (data.machine_room) {
+                // Sensor Termo (temperatura5) — línea que conecta al centro del termo
+                const t5Data = data.machine_room['temperatura5'];
+                if (t5Data) {
+                    const t5Val = t5Data.value !== null ? t5Data.value.toFixed(1) + '°C' : '--';
+                    const t5Color = t5Data.value !== null ? termoScaleColor(t5Data.value) : '#888';
+                    const t5LabelZ = tZ + tR*2 + 0.25;
+                    // Línea de conexión (flecha) del sensor al termo
+                    machineTraces.push({
+                        type: 'scatter3d', mode: 'lines',
+                        x: [(tX0+tX1)/2, (tX0+tX1)/2],
+                        y: [tY, tY],
+                        z: [tZ + tR*2, t5LabelZ - 0.1],
+                        line: { color: t5Color, width: 3 },
+                        hoverinfo: 'skip', showlegend: false,
+                    });
+                    machineTraces.push({
+                        type: 'scatter3d', mode: 'markers+text',
+                        x: [(tX0+tX1)/2], y: [tY], z: [t5LabelZ],
+                        marker: { size: 7, color: t5Color, symbol: 'diamond',
+                                  line: { color: '#fff', width: 1 } },
+                        text: ['Termo: ' + t5Val],
+                        textposition: 'top center',
+                        textfont: { color: '#E8B830', size: 9, family: 'monospace' },
+                        hovertemplate: '<b>Termo</b>: ' + t5Val + '<extra></extra>',
+                        showlegend: false,
+                    });
+                }
+
+                // Sensor Solar (temperatura2) — línea que conecta al cilindro del calentador
+                const t2Data = data.machine_room['temperatura2'];
+                if (t2Data) {
+                    const t2Val = t2Data.value !== null ? t2Data.value.toFixed(1) + '°C' : '--';
+                    const t2Color = t2Data.value !== null ? termoScaleColor(t2Data.value) : '#888';
+                    const t2LabelZ = solCylZ + solCylR + 0.25;
+                    // Línea de conexión al cilindro del calentador
+                    machineTraces.push({
+                        type: 'scatter3d', mode: 'lines',
+                        x: [(solX0+solX1)/2, (solX0+solX1)/2],
+                        y: [solY, solY],
+                        z: [solCylZ + solCylR, t2LabelZ - 0.1],
+                        line: { color: t2Color, width: 3 },
+                        hoverinfo: 'skip', showlegend: false,
+                    });
+                    machineTraces.push({
+                        type: 'scatter3d', mode: 'markers+text',
+                        x: [(solX0+solX1)/2], y: [solY], z: [t2LabelZ],
+                        marker: { size: 7, color: t2Color, symbol: 'diamond',
+                                  line: { color: '#fff', width: 1 } },
+                        text: ['Calentador: ' + t2Val],
+                        textposition: 'top center',
+                        textfont: { color: '#E8B830', size: 9, family: 'monospace' },
+                        hovertemplate: '<b>Calentador</b>: ' + t2Val + '<extra></extra>',
+                        showlegend: false,
+                    });
+
+                    // Panel inclinado coloreado por temperatura (posición nueva, pegado al tanque)
+                    machineTraces.push({
+                        type: 'mesh3d',
+                        x: [solCylX0+0.1, solCylX1-0.1, solCylX1-0.1, solCylX0+0.1],
+                        y: [panelYtop+0.05, panelYtop+0.05, panelYbot-0.05, panelYbot-0.05],
+                        z: [panelZtop-0.02, panelZtop-0.02, panelZbot+0.02, panelZbot+0.02],
+                        i: [0, 0], j: [1, 2], k: [2, 3],
+                        color: t2Color, opacity: 0.6,
+                        flatshading: true, showlegend: false,
+                        hovertemplate: '<b>Panel Solar</b>: ' + t2Val + '<extra></extra>',
+                    });
+                }
+
+                // Sensor Entrada (temperatura4) — en la tubería roja
+                const t4Data = data.machine_room['temperatura4'];
+                if (t4Data) {
+                    const t4Val = t4Data.value !== null ? t4Data.value.toFixed(1) + '°C' : '--';
+                    const t4Color = t4Data.value !== null ? tempColor(t4Data.value) : '#888';
+                    machineTraces.push({
+                        type: 'scatter3d', mode: 'markers+text',
+                        x: [pipeX[0] - 0.3], y: [pipeY[0]], z: [0.8],
+                        marker: { size: 7, color: t4Color, symbol: 'diamond',
+                                  line: { color: '#fff', width: 1 } },
+                        text: ['Entrada: ' + t4Val],
+                        textposition: 'top center',
+                        textfont: { color: '#E8B830', size: 9, family: 'monospace' },
+                        hovertemplate: '<b>Entrada</b>: ' + t4Val + '<extra></extra>',
+                        showlegend: false,
+                    });
+                }
+            }
+
+            // Etiqueta "SALA DE MÁQUINAS"
+            machineTraces.push({
+                type: 'scatter3d', mode: 'text',
+                x: [-5], y: [3], z: [2.8],
+                text: ['SALA DE MÁQUINAS'],
+                textfont: { color: '#E8B830', size: 10, family: 'monospace' },
+                hoverinfo: 'skip', showlegend: false,
+            });
+
+            const traces = [...isoTraces, house, furnitureTrace, ...lampTraces, ...extZoneTraces, ...radiantTraces, ...machineTraces, dropLines, markerTrace, nameTrace, valTrace];
 
             const roofPeak = data.z_range[1] + 1.5;
             const layout = {
@@ -1484,7 +2168,7 @@
                 showlegend: false,
                 scene: {
                     xaxis: {
-                        title: 'X (m)', range: [data.x_range[0] - 0.5, data.x_range[1] + 0.5],
+                        title: 'X (m)', range: [-9, data.x_range[1] + 0.5],
                         color: '#a08060', gridcolor: '#2a4050', backgroundcolor: '#1a2630',
                     },
                     yaxis: {
@@ -1497,9 +2181,11 @@
                     },
                     aspectratio: { x: 2, y: 1.2, z: 1 },
                     camera: {
-                        eye: { x: 1.6, y: -1.8, z: 1.0 },
+                        eye: { x: 1.6, y: -1.8, z: 0.8 },
                         up: { x: 0, y: 0, z: 1 },
+                        projection: { type: 'orthographic' },
                     },
+                    dragmode: 'turntable',
                     bgcolor: '#1a2630',
                 },
             };
@@ -1509,9 +2195,28 @@
             if (!plotInitialized) {
                 Plotly.newPlot('scene3d', traces, layout, plotConfig);
                 plotInitialized = true;
+                // Forzar solo rotación horizontal (bloquear elevación Z)
+                let lockingCam = false;
+                document.getElementById('scene3d').on('plotly_relayouting', function(evt) {
+                    if (lockingCam) return;
+                    if (evt['scene.camera']) {
+                        const c = evt['scene.camera'];
+                        if (Math.abs(c.eye.z - 0.8) > 0.01 || c.up.z !== 1) {
+                            c.eye.z = 0.8;
+                            c.up = { x: 0, y: 0, z: 1 };
+                            lockingCam = true;
+                            Plotly.relayout('scene3d', { 'scene.camera': c });
+                            lockingCam = false;
+                        }
+                    }
+                });
             } else {
                 const cam = getCurrentCamera();
-                if (cam) layout.scene.camera = cam;
+                if (cam) {
+                    cam.eye.z = 0.8;
+                    cam.up = { x: 0, y: 0, z: 1 };
+                    layout.scene.camera = cam;
+                }
                 Plotly.react('scene3d', traces, layout, plotConfig);
             }
         }
@@ -1591,13 +2296,26 @@
                 return minDiff < 300000 ? closest.value : null;
             }
 
+            // Extraer valores de todas las categorías al timestamp más cercano
             const tempValues = {};
-            for (const [label, values] of Object.entries(historyData.temperature)) {
+            for (const [label, values] of Object.entries(historyData.temperature || {})) {
                 tempValues[label] = findClosest(values, ts);
             }
             const humValues = {};
-            for (const [label, values] of Object.entries(historyData.humidity)) {
+            for (const [label, values] of Object.entries(historyData.humidity || {})) {
                 humValues[label] = findClosest(values, ts);
+            }
+            const rfValues = {};
+            for (const [label, values] of Object.entries(historyData.radiant_floor || {})) {
+                rfValues[label] = findClosest(values, ts);
+            }
+            const mrValues = {};
+            for (const [label, values] of Object.entries(historyData.machine_room || {})) {
+                mrValues[label] = findClosest(values, ts);
+            }
+            const otherValues = {};
+            for (const [label, values] of Object.entries(historyData.other || {})) {
+                otherValues[label] = findClosest(values, ts);
             }
 
             // Pedir interpolación al servidor
@@ -1612,18 +2330,48 @@
 
                 if (lastData) {
                     const histData = JSON.parse(JSON.stringify(lastData));
+
+                    // Actualizar sensores de temperatura interior
                     for (const [label, val] of Object.entries(tempValues)) {
                         if (histData.sensors[label] && val !== null) {
                             histData.sensors[label].value = val;
                         }
                     }
+                    // Temperatura exterior
+                    if (tempValues['tex'] !== undefined) histData.exterior_temp = tempValues['tex'];
+                    if (tempValues['tps'] !== undefined) histData.avg_temp_superior = tempValues['tps'];
+                    if (tempValues['tpi'] !== undefined) histData.avg_temp_inferior = tempValues['tpi'];
+
+                    // Humedad
                     for (const [label, val] of Object.entries(humValues)) {
                         if (val !== null) histData.humidity[label] = val;
                     }
+
+                    // Piso radiante
+                    for (const [label, val] of Object.entries(rfValues)) {
+                        if (histData.radiant_floor && histData.radiant_floor[label] && val !== null) {
+                            histData.radiant_floor[label].value = val;
+                        }
+                    }
+
+                    // Sala de máquinas
+                    for (const [label, val] of Object.entries(mrValues)) {
+                        if (histData.machine_room && histData.machine_room[label] && val !== null) {
+                            histData.machine_room[label].value = val;
+                        }
+                    }
+
+                    // Otras variables
+                    if (otherValues['amoniaco'] !== undefined) histData.amoniaco = otherValues['amoniaco'];
+                    if (otherValues['ventilador'] !== undefined) histData.fan_on = otherValues['ventilador'] >= 1;
+                    if (otherValues['extractor'] !== undefined) histData.extractor_on = otherValues['extractor'] >= 1;
+
+                    // Volúmenes interpolados
                     if (volumes.volume_data) histData.volume_data = volumes.volume_data;
                     if (volumes.humidity_volume_data) histData.humidity_volume_data = volumes.humidity_volume_data;
 
                     updateIndicators(histData);
+                    updateDashboard(histData);
                     plotInitialized = false;
                     buildScene(histData);
                 }
@@ -1664,6 +2412,33 @@
 
         fetchData();
         setInterval(fetchData, REFRESH_MS);
+
+        // Rotación con flechas del teclado (solo horizontal)
+        document.addEventListener('keydown', function(e) {
+            if (!plotInitialized) return;
+            const el = document.getElementById('scene3d');
+            const cam = null;
+            try {
+                if (el._fullLayout && el._fullLayout.scene && el._fullLayout.scene._scene) {
+                    const c = el._fullLayout.scene._scene.getCamera();
+                    if (!c) return;
+                    const step = 0.15; // velocidad de rotación
+                    const ex = c.eye.x, ey = c.eye.y;
+                    const dist = Math.sqrt(ex * ex + ey * ey);
+                    const angle = Math.atan2(ey, ex);
+                    let newAngle = angle;
+                    if (e.key === 'ArrowLeft') newAngle += step;
+                    else if (e.key === 'ArrowRight') newAngle -= step;
+                    else return;
+                    e.preventDefault();
+                    c.eye.x = dist * Math.cos(newAngle);
+                    c.eye.y = dist * Math.sin(newAngle);
+                    c.eye.z = 0.8;
+                    c.up = { x: 0, y: 0, z: 1 };
+                    Plotly.relayout('scene3d', { 'scene.camera': c });
+                }
+            } catch (err) {}
+        });
     </script>
 </body>
 </html>

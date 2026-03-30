@@ -67,8 +67,13 @@ Retorna datos JSON para la visualización del mapa de calor 3D.
   },
   "amoniaco": 0.0,
   "radiant_floor": {
-    "temperatura1": {"value": 18.5, "name": "Salida"},
+    "temperatura1": {"value": 18.5, "name": "Salida Piso"},
     "temperatura3": {"value": 19.1, "name": "Medio Piso"}
+  },
+  "machine_room": {
+    "temperatura2": {"value": 22.5, "name": "Solar"},
+    "temperatura4": {"value": 19.2, "name": "Entrada Cuarto"},
+    "temperatura5": {"value": 45.0, "name": "Termo"}
   }
 }
 ```
@@ -96,6 +101,7 @@ Retorna datos JSON para la visualización del mapa de calor 3D.
 | `humidity` | objeto | Valores de humedad por sensor (h1–h5, hum_general). |
 | `amoniaco` | float o null | Última lectura del sensor de amoníaco en PPM. |
 | `radiant_floor` | objeto | Valores de los sensores del piso radiante (temperatura1, temperatura3) con nombre y valor. |
+| `machine_room` | objeto | Valores de los sensores de la sala de máquinas (temperatura2=Solar, temperatura4=Entrada, temperatura5=Termo). |
 
 ## GET /api/history
 

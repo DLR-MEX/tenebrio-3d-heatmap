@@ -19,11 +19,17 @@ Este sistema monitorea la distribución de temperatura y humedad interna de un c
 - Monitoreo de amoníaco (PPM) con barra codificada por color
 - Termómetros verticales por sensor con colores interpolados
 - Visualización del sistema de piso radiante (losa de concreto, tuberías serpentín, sensores)
+- Sala de máquinas con rotoplas, calentador solar, termo y circuito hidráulico completo
+- Sensores de sala de máquinas: calentador solar, termo (escala 15-90°C), entrada cuarto
+- Válvulas V1 y V2 con distribución en "H" para el piso radiante
+- Geometría cilíndrica real (mesh3d triangulado) para rotoplas, termo y tanque solar
 - Indicadores de temperatura del piso radiante (salida, medio piso)
+- Modo "Solo Piso" para visualizar únicamente el piso radiante sin isosuperficies
 - Widgets SVG animados de ventilador y extractor
 - Marcas de rango ideal en barras de temperatura (23–28°C) y humedad (60–88%)
 - Estado de conexión MQTT y visualización de timestamp
-- Wireframe 3D: techo inclinado, ventanas, mueble, lámparas vintage, jardinera
+- Wireframe 3D: techo inclinado, ventanas, mueble, lámparas vintage, jardinera, corredor techado
+- Vista isométrica con rotación solo horizontal (teclado con flechas)
 - Diseño responsivo (escritorio, tablet, móvil vertical y horizontal)
 - Interfaz con marca TECHNEBRIOS e Ingeniería Condor
 - Fuente Orbitron para visualización de fecha/hora

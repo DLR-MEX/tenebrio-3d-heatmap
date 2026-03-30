@@ -23,6 +23,7 @@ MQTT Variables:
   Averages:     tps (promedio superior), tpi (promedio inferior)
   Humidity:     h1, h2, h3, h4, h5, hum_general
   Radiant:      temperatura1 (salida), temperatura3 (medio piso)
+  Machine:      temperatura2 (calentador solar), temperatura4 (entrada cuarto), temperatura5 (termo)
   Ammonia:      amoniaco (PPM)
   Devices:      ventilador, extractor (on/off)
 
@@ -45,12 +46,23 @@ The 3D scene includes:
 - TEX sensor marker colored by temperature.
 - Radiant floor system (X=1..9, Y=0.5..5.5, Z=0..0.5):
   concrete slab colored by floor temperature, serpentine heating pipes (red),
-  entry pipe (red) + return pipe (blue), reinforcement mesh, insulation layer,
+  derivación central, entry pipe (red) + return pipe (gray),
+  reinforcement mesh, insulation layer,
   2 temperature sensors (temperatura1=salida, temperatura3=medio piso).
+  Válvulas V1 y V2 en distribución "H" al borde del piso.
+- Machine room (X=-8..-2, adjacent via corridor X=-2..0):
+  Rotoplas (cilíndrico vertical, color=sensor salida), Bomba M2 dentro,
+  Calentador solar sobre el techo (panel inclinado + tanque cilíndrico, color=temperatura2),
+  Termo (cilíndrico horizontal acostado, color=temperatura5, escala 15-90°C),
+  Circuito hidráulico: retorno(gris) → rotoplas → bomba → solar → termo → V1/V2 → serpentín.
+  Corredor techado (X=-2..0, Z=2.5) conecta ambos cuartos.
+  Sensores: temperatura2 (calentador), temperatura4 (entrada), temperatura5 (termo).
+  Geometría cilíndrica real (mesh3d triangulado) para rotoplas, termo y tanque solar.
 
 Side panel indicators:
 - 5 vertical thermometers (T1-T5) with ideal range marks (23-28°C).
 - 3 horizontal temperature bars: Exterior, Superior, Inferior.
+- 3 horizontal machine room bars: Calentador (30-90°C), Entrada, Termo (15-90°C).
 - 6 horizontal humidity bars (H1-H5, General) with ideal range marks (60-88%).
 - 1 horizontal ammonia bar (0-5 PPM).
 - Animated SVG fan/extractor widgets (spinning when ON).

@@ -21,6 +21,7 @@ ALL_VARIABLES = (
     + [config.EXTERIOR_TEMP_LABEL, config.FAN_LABEL, config.EXTRACTOR_LABEL]
     + [config.AVG_TEMP_SUPERIOR_LABEL, config.AVG_TEMP_INFERIOR_LABEL]
     + list(config.RADIANT_FLOOR_LABELS.keys())
+    + list(config.MACHINE_ROOM_LABELS.keys())
     + config.HUMIDITY_LABELS
     + [config.AMMONIA_LABEL]
 )

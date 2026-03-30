@@ -43,6 +43,14 @@ Este sistema monitorea la temperatura interna, humedad y condiciones ambientales
 | temperatura1 | Temperatura de salida del piso |
 | temperatura3 | Temperatura medio piso |
 
+### Sensores de Sala de Máquinas y Solar
+
+| Sensor | Descripción |
+|--------|-------------|
+| temperatura2 | Temperatura del calentador solar |
+| temperatura4 | Temperatura de entrada al cuarto |
+| temperatura5 | Temperatura del termo (escala 15-90°C) |
+
 ### Otros Sensores
 
 | Sensor | Descripción |
