@@ -667,8 +667,8 @@
             if (lastData) buildScene(lastData);
         }
 
-        // Colorscale: blue (cold <20) -> green (ideal 20-30) -> red (hot >30)
-        // Mapped to VMIN=15..VMAX=40: 20C=0.2, 25C=0.4, 30C=0.6
+        // Escala de color: azul (frío <20) -> verde (ideal 20-30) -> rojo (caliente >30)
+        // Mapeado a VMIN=14..VMAX=35
         const TEMP_COLORSCALE = [
             [0,    'rgb(0,0,200)'],      // 15 C — deep blue (very cold)
             [0.1,  'rgb(0,80,255)'],     // 17.5 C — blue
@@ -683,7 +683,7 @@
         ];
 
         // ---------------------------------------------------------------
-        // House wireframe: walls + door on LEFT wall (X=0) + triangular roof
+        // Wireframe de la casa: paredes + puerta en pared X=0 + techo inclinado
         // ---------------------------------------------------------------
         function buildHouseStructure(xr, yr, zr) {
             const [x0, x1] = xr;
@@ -697,13 +697,13 @@
             const segments = [];
             function edge(a, b) { segments.push(a, b, null); }
 
-            // Floor
+            // Piso
             edge([x0,y0,z0],[x1,y0,z0]); edge([x1,y0,z0],[x1,y1,z0]);
             edge([x1,y1,z0],[x0,y1,z0]); edge([x0,y1,z0],[x0,y0,z0]);
-            // Ceiling
+            // Techo
             edge([x0,y0,z1],[x1,y0,z1]); edge([x1,y0,z1],[x1,y1,z1]);
             edge([x1,y1,z1],[x0,y1,z1]); edge([x0,y1,z1],[x0,y0,z1]);
-            // Pillars
+            // Pilares
             edge([x0,y0,z0],[x0,y0,z1]); edge([x1,y0,z0],[x1,y0,z1]);
             edge([x1,y1,z0],[x1,y1,z1]); edge([x0,y1,z0],[x0,y1,z1]);
             // Techo inclinado: punto alto en Y=0, cae hacia Y=6 (triángulo escaleno)
@@ -712,7 +712,7 @@
             edge([x1,y0,z1],[x1,y0,roofPeak]);          // pilar der Y=0 sube al pico
             edge([x0,y0,roofPeak],[x0,y1,z1]);           // caída izq hacia Y=6
             edge([x1,y0,roofPeak],[x1,y1,z1]);           // caída der hacia Y=6
-            // Door on back wall (X=0)
+            // Puerta en pared trasera (X=0)
             const doorY0 = 2.5, doorY1 = 3.5;
             edge([x0,doorY0,z0],[x0,doorY0,doorZ1]);
             edge([x0,doorY0,doorZ1],[x0,doorY1,doorZ1]);
@@ -794,13 +794,13 @@
             const px_p0 = 1, px_p1 = 3;
             const py_p0 = y1, py_p1 = y1 + 0.3;
             const pz1 = 0.7;                      // height
-            // Bottom rectangle
+            // Rectángulo inferior
             edge([px_p0,py_p0,z0],[px_p1,py_p0,z0]); edge([px_p1,py_p0,z0],[px_p1,py_p1,z0]);
             edge([px_p1,py_p1,z0],[px_p0,py_p1,z0]); edge([px_p0,py_p1,z0],[px_p0,py_p0,z0]);
-            // Top rectangle
+            // Rectángulo superior
             edge([px_p0,py_p0,pz1],[px_p1,py_p0,pz1]); edge([px_p1,py_p0,pz1],[px_p1,py_p1,pz1]);
             edge([px_p1,py_p1,pz1],[px_p0,py_p1,pz1]); edge([px_p0,py_p1,pz1],[px_p0,py_p0,pz1]);
-            // Vertical edges
+            // Aristas verticales
             edge([px_p0,py_p0,z0],[px_p0,py_p0,pz1]); edge([px_p1,py_p0,z0],[px_p1,py_p0,pz1]);
             edge([px_p1,py_p1,z0],[px_p1,py_p1,pz1]); edge([px_p0,py_p1,z0],[px_p0,py_p1,pz1]);
 
@@ -818,7 +818,7 @@
         }
 
         // ---------------------------------------------------------------
-        // Connection & MQTT status indicator
+        // Indicador de estado de conexión MQTT
         // ---------------------------------------------------------------
         function updateConnectionStatus(httpOk, mqttConnected) {
             const dot = document.getElementById('conn-dot');
@@ -837,7 +837,7 @@
         }
 
         // ---------------------------------------------------------------
-        // Dashboard status cards
+        // Actualización del dashboard
         // ---------------------------------------------------------------
         function updateDashboard(data) {
             updateConnectionStatus(true, data.mqtt_connected);
@@ -1033,7 +1033,7 @@
         }
 
         // ---------------------------------------------------------------
-        // Safe camera read (Plotly private API, wrapped in try/catch)
+        // Lectura segura de la cámara (API privada de Plotly)
         // ---------------------------------------------------------------
         function getCurrentCamera() {
             try {
@@ -1042,7 +1042,7 @@
                     return el._fullLayout.scene._scene.getCamera();
                 }
             } catch (e) {
-                // Private API may change across Plotly versions
+                // La API privada puede cambiar entre versiones de Plotly
             }
             return null;
         }
@@ -1100,7 +1100,7 @@
                 });
             }
 
-            // Sensor markers — cambian según modo temp/humedad
+            // Marcadores de sensores — cambian según modo temp/humedad
             const sx = [], sy = [], sz = [], sHover = [];
             const sensorKeys = Object.keys(data.sensors);
             const humLabels = {'t1':'h1','t2':'h2','t3':'h3','t4':'h4','t5':'h5'};
@@ -1155,10 +1155,10 @@
                 const zCeil = zWall + 1.5 - (lp.y / 6) * 1.5;
                 const lampBottom = zWall - 0.1; // justo debajo de la línea de pared
                 const shadeR = 0.35; // radio de la pantalla circular
-                const shadeZ = lampBottom; // Z de la pantalla
+                const shadeZ = lampBottom;
                 const nSeg = 16; // segmentos del círculo
 
-                // Barra de metal (línea del techo al borde superior de la pantalla)
+                // Barra de metal (del techo al borde superior de la pantalla)
                 const barX = [], barY = [], barZ = [];
                 barX.push(lp.x, lp.x, null);
                 barY.push(lp.y, lp.y, null);
@@ -1254,7 +1254,7 @@
                 });
             }
 
-            // Sensor name labels — cambian según modo
+            // Etiquetas de nombre de sensores — cambian según modo
             const nameTexts = [];
             for (const label of Object.keys(data.sensors)) {
                 nameTexts.push(isTemp ? label : (humLabels[label] || label));
@@ -1270,7 +1270,7 @@
                 hoverinfo: 'skip', showlegend: false,
             };
 
-            // Sensor value labels — cambian según modo
+            // Etiquetas de valor de sensores — cambian según modo
             const valTexts = [];
             for (const [label, info] of Object.entries(data.sensors)) {
                 if (isTemp) {
@@ -1295,7 +1295,7 @@
                 hoverinfo: 'skip', showlegend: false,
             };
 
-            // Drop lines
+            // Líneas de caída
             const dlx = [], dly = [], dlz = [];
             for (let i = 0; i < sx.length; i++) {
                 dlx.push(sx[i], sx[i], null);
@@ -1309,7 +1309,7 @@
                 hoverinfo: 'skip', showlegend: false,
             };
 
-            // House wireframe
+            // Wireframe de la casa
             const house = buildHouseStructure(data.x_range, data.y_range, data.z_range);
 
             // ---- Piso radiante ----
@@ -1517,7 +1517,7 @@
         }
 
         // ---------------------------------------------------------------
-        // Data polling with timeout
+        // Consulta de datos con timeout
         // ---------------------------------------------------------------
         // ---------------------------------------------------------------
         // Historial de datos desde Ubidots
