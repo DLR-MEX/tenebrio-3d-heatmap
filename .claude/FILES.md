@@ -23,4 +23,5 @@ tenebrios/
 ├── setup_service.bat
 ├── restart_service.bat
 ├── stop_service.bat
-└── power_always_on.bat
+├── power_always_on.bat
+└── power_always_on.ps1
