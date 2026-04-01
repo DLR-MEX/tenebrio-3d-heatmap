@@ -126,6 +126,12 @@ if %errorlevel% equ 0 (
     echo       Deteniendo servicio existente...
     nssm stop %SERVICE_NAME% >nul 2>&1
     timeout /t 3 /nobreak >nul
+    :: Forzar terminacion si no respondio
+    for /f "tokens=3" %%p in ('sc queryex %SERVICE_NAME% ^| findstr PID') do (
+        if %%p neq 0 taskkill /PID %%p /T /F >nul 2>&1
+    )
+    powershell -Command "Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }" >nul 2>&1
+    timeout /t 2 /nobreak >nul
     echo       Removiendo servicio anterior...
     nssm remove %SERVICE_NAME% confirm >nul 2>&1
     timeout /t 2 /nobreak >nul
