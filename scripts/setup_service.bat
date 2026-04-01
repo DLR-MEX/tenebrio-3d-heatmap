@@ -268,7 +268,7 @@ if not defined BROWSER (
     goto :EOF
 )
 
-start "" "%BROWSER%" --kiosk --new-window --no-first-run --no-default-browser-check --no-restore "%APP_URL%"
+start "" "%BROWSER%" --kiosk --new-window --no-first-run --no-default-browser-check --no-restore --disable-translate --disable-extensions "%APP_URL%"
 
 :: Traer ventana al frente
 timeout /t 3 /nobreak >nul

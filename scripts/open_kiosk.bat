@@ -23,4 +23,4 @@ if exist "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" set "BROW
 if not defined BROWSER exit /b 1
 
 :: Abrir Chrome en modo kiosko
-start "" "%BROWSER%" --kiosk --new-window --no-first-run --no-default-browser-check --no-restore "%APP_URL%"
+start "" "%BROWSER%" --kiosk --new-window --no-first-run --no-default-browser-check --no-restore --disable-translate --disable-extensions "%APP_URL%"
