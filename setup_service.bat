@@ -142,14 +142,13 @@ if %errorlevel% neq 0 (
 :: Configurar directorio de trabajo
 nssm set %SERVICE_NAME% AppDirectory "%BACKEND_DIR%"
 
-:: Configurar redirección de stdout/stderr de NSSM (respaldo adicional a los logs internos)
-nssm set %SERVICE_NAME% AppStdout "%LOGS_DIR%\nssm_stdout.log"
-nssm set %SERVICE_NAME% AppStderr "%LOGS_DIR%\nssm_stderr.log"
-nssm set %SERVICE_NAME% AppStdoutCreationDisposition 4
-nssm set %SERVICE_NAME% AppStderrCreationDisposition 4
-nssm set %SERVICE_NAME% AppRotateFiles 1
-nssm set %SERVICE_NAME% AppRotateOnline 1
-nssm set %SERVICE_NAME% AppRotateBytes 5242880
+:: Redirigir stdout/stderr de NSSM a un solo archivo (sin rotación)
+:: Los logs principales los gestiona log_config.py en logs/YYYY-MM/YYYY-MM-DD.log
+nssm set %SERVICE_NAME% AppStdout "%LOGS_DIR%\nssm_service.log"
+nssm set %SERVICE_NAME% AppStderr "%LOGS_DIR%\nssm_service.log"
+nssm set %SERVICE_NAME% AppStdoutCreationDisposition 2
+nssm set %SERVICE_NAME% AppStderrCreationDisposition 2
+nssm set %SERVICE_NAME% AppRotateFiles 0
 
 :: Configurar reinicio automático ante fallos
 nssm set %SERVICE_NAME% AppRestartDelay 5000
