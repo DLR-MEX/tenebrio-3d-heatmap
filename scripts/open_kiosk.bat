@@ -10,9 +10,10 @@ set "WAIT_SECONDS=15"
 :: Esperar a que el servicio Flask arranque
 timeout /t %WAIT_SECONDS% /nobreak >nul
 
-:: Cerrar Edge para que no interfiera
+:: Matar Edge e iniciar vigilante en segundo plano
 taskkill /F /IM msedge.exe >nul 2>&1
 timeout /t 2 /nobreak >nul
+start /min "" cmd /c "%~dp0edge_killer.bat"
 
 :: Detectar Chrome
 set "BROWSER="

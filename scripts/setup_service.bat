@@ -209,12 +209,17 @@ echo.
 echo       Esperando %WAIT_SECONDS% segundos para que el servidor arranque...
 timeout /t %WAIT_SECONDS% /nobreak >nul
 
-echo       Cerrando Edge para evitar conflictos...
+echo       Desactivando Edge completamente...
 taskkill /F /IM msedge.exe >nul 2>&1
-:: Desactivar inicio automatico de Edge en segundo plano
 reg add "HKLM\SOFTWARE\Policies\Microsoft\Edge" /v StartupBoostEnabled /t REG_DWORD /d 0 /f >nul 2>&1
 reg add "HKLM\SOFTWARE\Policies\Microsoft\Edge" /v BackgroundModeEnabled /t REG_DWORD /d 0 /f >nul 2>&1
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Edge" /v AllowPrelaunch /t REG_DWORD /d 0 /f >nul 2>&1
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Edge" /v RestoreOnStartup /t REG_DWORD /d 5 /f >nul 2>&1
 timeout /t 2 /nobreak >nul
+
+:: Iniciar edge_killer en segundo plano
+echo       Iniciando vigilante de Edge en segundo plano...
+start /min "" cmd /c "%~dp0edge_killer.bat"
 
 echo       Abriendo Chrome en modo kiosko...
 call :OPEN_KIOSK

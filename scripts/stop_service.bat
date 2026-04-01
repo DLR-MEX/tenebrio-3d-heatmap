@@ -82,33 +82,44 @@ powershell -Command "Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyC
 echo       OK
 
 :: ============================================================
-:: 4. Cerrar navegador en modo kiosko y limpiar rastros
+:: 4. Detener vigilante de Edge (edge_killer)
 :: ============================================================
 echo.
-echo [4/5] Cerrando navegador en modo kiosko...
+echo [4/7] Deteniendo vigilante de Edge...
 
-:: Matar todos los procesos de Edge y Chrome que usen --kiosk
-powershell -Command "Get-WmiObject Win32_Process -Filter \"Name='msedge.exe' OR Name='chrome.exe'\" | Where-Object { $_.CommandLine -match 'kiosk|localhost:5000' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
-
-:: Si Edge quedo con sesion de localhost, limpiar la restauracion
-powershell -Command "Get-Process msedge -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -match 'localhost|5000|Tenebrio|Heatmap' } | Stop-Process -Force -ErrorAction SilentlyContinue" >nul 2>&1
+:: Matar edge_killer.bat y cualquier cmd que lo ejecute
+powershell -Command "Get-WmiObject Win32_Process -Filter \"Name='cmd.exe'\" | Where-Object { $_.CommandLine -match 'edge_killer' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
 
 echo       OK
 
 :: ============================================================
-:: 5. Eliminar tarea programada del kiosko
+:: 5. Cerrar navegador en modo kiosko
 :: ============================================================
 echo.
-echo [5/6] Eliminando tarea programada del kiosko...
+echo [5/7] Cerrando navegador en modo kiosko...
+
+:: Matar Chrome kiosko con localhost:5000
+powershell -Command "Get-WmiObject Win32_Process -Filter \"Name='chrome.exe'\" | Where-Object { $_.CommandLine -match 'kiosk|localhost:5000' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
+
+:: Matar Edge residual
+taskkill /F /IM msedge.exe >nul 2>&1
+
+echo       OK
+
+:: ============================================================
+:: 6. Eliminar tarea programada del kiosko
+:: ============================================================
+echo.
+echo [6/7] Eliminando tarea programada del kiosko...
 
 schtasks /delete /tn "TenebrioKiosk" /f >nul 2>&1
 echo       OK
 
 :: ============================================================
-:: 6. Limpiar inicio automatico del navegador con localhost
+:: 7. Limpiar inicio automatico del navegador con localhost
 :: ============================================================
 echo.
-echo [6/6] Limpiando inicio automatico...
+echo [7/7] Limpiando inicio automatico...
 
 :: Eliminar entradas del registro que abran localhost al inicio
 powershell -Command "
@@ -144,6 +155,7 @@ echo ============================================================
 echo.
 echo   Servicio:           Desinstalado
 echo   Puerto 5000:        Liberado
+echo   Vigilante Edge:     Detenido
 echo   Navegador kiosko:   Cerrado
 echo   Tarea programada:   Eliminada
 echo   Inicio automatico:  Limpiado
