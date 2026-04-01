@@ -8,13 +8,13 @@ setlocal EnableDelayedExpansion
 
 :: --- Configuración ---
 set "SERVICE_NAME=TenebrioHeatmap"
-set "PROJECT_DIR=%~dp0"
-set "BACKEND_DIR=%PROJECT_DIR%backend"
-set "VENV_DIR=%PROJECT_DIR%venv"
+set "PROJECT_DIR=%~dp0.."
+set "BACKEND_DIR=%PROJECT_DIR%\backend"
+set "VENV_DIR=%PROJECT_DIR%\venv"
 set "PYTHON_VENV=%VENV_DIR%\Scripts\python.exe"
-set "REQUIREMENTS=%PROJECT_DIR%requirements.txt"
+set "REQUIREMENTS=%PROJECT_DIR%\requirements.txt"
 set "MAIN_SCRIPT=%BACKEND_DIR%\main.py"
-set "LOGS_DIR=%PROJECT_DIR%logs"
+set "LOGS_DIR=%PROJECT_DIR%\logs"
 set "APP_URL=http://localhost:5000"
 set "WAIT_SECONDS=8"
 
@@ -189,7 +189,7 @@ echo       Servicio iniciado correctamente.
 echo.
 echo [8/8] Configurando kiosko automatico al iniciar sesion...
 
-set "KIOSK_SCRIPT=%PROJECT_DIR%\open_kiosk.bat"
+set "KIOSK_SCRIPT=%~dp0open_kiosk.bat"
 set "TASK_NAME=TenebrioKiosk"
 
 :: Eliminar tarea anterior si existe
@@ -209,11 +209,14 @@ echo.
 echo       Esperando %WAIT_SECONDS% segundos para que el servidor arranque...
 timeout /t %WAIT_SECONDS% /nobreak >nul
 
-echo       Cerrando Edge para abrir en modo kiosko limpio...
+echo       Cerrando Edge para evitar conflictos...
 taskkill /F /IM msedge.exe >nul 2>&1
+:: Desactivar inicio automatico de Edge en segundo plano
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Edge" /v StartupBoostEnabled /t REG_DWORD /d 0 /f >nul 2>&1
+reg add "HKLM\SOFTWARE\Policies\Microsoft\Edge" /v BackgroundModeEnabled /t REG_DWORD /d 0 /f >nul 2>&1
 timeout /t 2 /nobreak >nul
 
-echo       Abriendo navegador en modo kiosko...
+echo       Abriendo Chrome en modo kiosko...
 call :OPEN_KIOSK
 
 :: ============================================================
@@ -243,18 +246,15 @@ pause
 exit /b 0
 
 :: ============================================================
-:: Subrutina: abrir navegador en modo kiosko (pantalla completa)
-:: Edge debe estar cerrado para que --kiosk funcione correctamente
+:: Subrutina: abrir Chrome en modo kiosko (pantalla completa)
 :: ============================================================
 :OPEN_KIOSK
 set "BROWSER="
-if exist "C:\Program Files\Microsoft\Edge\Application\msedge.exe" set "BROWSER=C:\Program Files\Microsoft\Edge\Application\msedge.exe"
-if exist "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" set "BROWSER=C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" set "BROWSER=C:\Program Files\Google\Chrome\Application\chrome.exe"
 if exist "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" set "BROWSER=C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
 
 if not defined BROWSER (
-    echo [AVISO] No se encontro Edge ni Chrome.
+    echo [ERROR] Chrome no esta instalado. Instala Google Chrome para modo kiosko.
     goto :EOF
 )
 
@@ -262,6 +262,6 @@ start "" "%BROWSER%" --kiosk --new-window --no-first-run --no-default-browser-ch
 
 :: Traer ventana al frente
 timeout /t 3 /nobreak >nul
-powershell -Command "Add-Type -Name W -Namespace N -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr h);'; $p = Get-Process | Where-Object { $_.MainWindowTitle -ne '' -and ($_.Name -match 'msedge|chrome') } | Select-Object -First 1; if ($p) { [N.W]::SetForegroundWindow($p.MainWindowHandle) }" >nul 2>&1
+powershell -Command "Add-Type -Name W -Namespace N -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr h);'; $p = Get-Process | Where-Object { $_.MainWindowTitle -ne '' -and ($_.Name -eq 'chrome') } | Select-Object -First 1; if ($p) { [N.W]::SetForegroundWindow($p.MainWindowHandle) }" >nul 2>&1
 
 goto :EOF
