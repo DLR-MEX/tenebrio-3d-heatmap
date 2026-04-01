@@ -185,13 +185,12 @@ timeout /t %WAIT_SECONDS% /nobreak >nul
 echo       Verificando conexion al servidor...
 powershell -Command "try { $r = Invoke-WebRequest -Uri '%APP_URL%' -TimeoutSec 10 -UseBasicParsing; exit 0 } catch { exit 1 }" >nul 2>&1
 if %errorlevel% equ 0 (
-    echo       Servidor respondiendo. Abriendo navegador...
-    start "" "%APP_URL%"
+    echo       Servidor respondiendo. Abriendo navegador en modo kiosko...
 ) else (
     echo [AVISO] El servidor aun no responde en %APP_URL%.
-    echo         Puede tardar unos segundos mas. Intentando abrir el navegador de todas formas...
-    start "" "%APP_URL%"
+    echo         Puede tardar unos segundos mas. Abriendo navegador de todas formas...
 )
+call :OPEN_KIOSK
 
 :: ============================================================
 :: Resumen final
@@ -216,3 +215,29 @@ echo     nssm remove %SERVICE_NAME%     - Desinstalar
 echo.
 echo ============================================================
 pause
+exit /b 0
+
+:: ============================================================
+:: Subrutina: abrir navegador en modo kiosko (pantalla completa)
+:: Detecta Edge o Chrome y lo abre siempre al frente
+:: ============================================================
+:OPEN_KIOSK
+set "BROWSER="
+if exist "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" set "BROWSER=C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+if exist "C:\Program Files\Microsoft\Edge\Application\msedge.exe" set "BROWSER=C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" set "BROWSER=C:\Program Files\Google\Chrome\Application\chrome.exe"
+if exist "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" set "BROWSER=C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
+
+if not defined BROWSER (
+    echo [AVISO] No se encontro Edge ni Chrome. Abriendo con navegador predeterminado...
+    start "" "%APP_URL%"
+    goto :EOF
+)
+
+start "" "%BROWSER%" --kiosk --new-window "%APP_URL%"
+
+:: Traer ventana del navegador al frente
+timeout /t 2 /nobreak >nul
+powershell -Command "Add-Type -Name W -Namespace N -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr h);'; $p = Get-Process | Where-Object { $_.MainWindowTitle -ne '' -and ($_.Name -match 'msedge|chrome') } | Select-Object -First 1; if ($p) { [N.W]::SetForegroundWindow($p.MainWindowHandle) }" >nul 2>&1
+
+goto :EOF
