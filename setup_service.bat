@@ -30,7 +30,7 @@ title Tenebrio Heatmap - Instalador de servicio
 :: 1. Verificar permisos de administrador
 :: ============================================================
 echo.
-echo [1/7] Verificando permisos de administrador...
+echo [1/8] Verificando permisos de administrador...
 net session >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Este script requiere permisos de administrador.
@@ -44,7 +44,7 @@ echo       OK - Ejecutando como administrador.
 :: 2. Verificar que NSSM existe en el PATH
 :: ============================================================
 echo.
-echo [2/7] Verificando NSSM...
+echo [2/8] Verificando NSSM...
 where nssm >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] NSSM no se encontro en el PATH.
@@ -59,7 +59,7 @@ echo       OK - NSSM encontrado.
 :: 3. Verificar que Python existe
 :: ============================================================
 echo.
-echo [3/7] Verificando Python...
+echo [3/8] Verificando Python...
 where python >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Python no se encontro en el PATH.
@@ -76,7 +76,7 @@ echo       OK - Python %PY_VERSION% encontrado.
 :: 4. Crear entorno virtual e instalar dependencias
 :: ============================================================
 echo.
-echo [4/7] Configurando entorno virtual...
+echo [4/8] Configurando entorno virtual...
 
 if not exist "%PYTHON_VENV%" (
     echo       Creando entorno virtual en %VENV_DIR%...
@@ -106,7 +106,7 @@ echo       OK - Dependencias instaladas.
 :: 5. Crear carpeta de logs
 :: ============================================================
 echo.
-echo [5/7] Preparando carpeta de logs...
+echo [5/8] Preparando carpeta de logs...
 if not exist "%LOGS_DIR%" (
     mkdir "%LOGS_DIR%"
     echo       Carpeta logs creada.
@@ -118,7 +118,7 @@ if not exist "%LOGS_DIR%" (
 :: 6. Instalar/actualizar servicio con NSSM
 :: ============================================================
 echo.
-echo [6/7] Configurando servicio "%SERVICE_NAME%"...
+echo [6/8] Configurando servicio "%SERVICE_NAME%"...
 
 :: Detener servicio si ya existe
 nssm status %SERVICE_NAME% >nul 2>&1
@@ -168,10 +168,10 @@ nssm set %SERVICE_NAME% Start SERVICE_AUTO_START
 echo       OK - Servicio instalado y configurado.
 
 :: ============================================================
-:: 7. Iniciar servicio y abrir navegador
+:: 7. Iniciar servicio
 :: ============================================================
 echo.
-echo [7/7] Iniciando servicio...
+echo [7/8] Iniciando servicio...
 nssm start %SERVICE_NAME%
 if %errorlevel% neq 0 (
     echo [ERROR] No se pudo iniciar el servicio.
@@ -182,16 +182,37 @@ if %errorlevel% neq 0 (
 )
 
 echo       Servicio iniciado correctamente.
+
+:: ============================================================
+:: 8. Crear tarea programada para abrir kiosko al iniciar sesion
+:: ============================================================
+echo.
+echo [8/8] Configurando kiosko automatico al iniciar sesion...
+
+set "KIOSK_SCRIPT=%PROJECT_DIR%\open_kiosk.bat"
+set "TASK_NAME=TenebrioKiosk"
+
+:: Eliminar tarea anterior si existe
+schtasks /delete /tn "%TASK_NAME%" /f >nul 2>&1
+
+:: Crear tarea que se ejecuta al iniciar sesion de cualquier usuario
+schtasks /create /tn "%TASK_NAME%" /tr "\"%KIOSK_SCRIPT%\"" /sc onlogon /rl highest /f >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [AVISO] No se pudo crear la tarea programada.
+    echo         El kiosko no se abrira automaticamente al encender.
+) else (
+    echo       OK - Kiosko se abrira automaticamente al iniciar sesion.
+)
+
+:: Abrir kiosko ahora
 echo.
 echo       Esperando %WAIT_SECONDS% segundos para que el servidor arranque...
 timeout /t %WAIT_SECONDS% /nobreak >nul
 
-:: Matar cualquier navegador que tenga localhost:5000 de sesiones anteriores
-echo       Cerrando sesiones anteriores del navegador...
-powershell -Command "Get-WmiObject Win32_Process -Filter \"Name='msedge.exe' OR Name='chrome.exe'\" | Where-Object { $_.CommandLine -match 'localhost:5000' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
+echo       Cerrando Edge para abrir en modo kiosko limpio...
+taskkill /F /IM msedge.exe >nul 2>&1
 timeout /t 2 /nobreak >nul
 
-:: Abrir navegador en modo kiosko
 echo       Abriendo navegador en modo kiosko...
 call :OPEN_KIOSK
 
@@ -203,18 +224,19 @@ echo ============================================================
 echo   INSTALACION COMPLETADA
 echo ============================================================
 echo.
-echo   Servicio:    %SERVICE_NAME%
-echo   Estado:      Ejecutandose
-echo   URL:         %APP_URL%
-echo   Logs app:    %LOGS_DIR%\YYYY-MM\YYYY-MM-DD.log
-echo   Logs NSSM:   %LOGS_DIR%\nssm_service.log
+echo   Servicio:      %SERVICE_NAME% (auto-inicia con Windows)
+echo   Kiosko:        %TASK_NAME% (auto-abre al iniciar sesion)
+echo   URL:           %APP_URL%
+echo   Logs app:      %LOGS_DIR%\YYYY-MM\YYYY-MM-DD.log
+echo   Logs NSSM:     %LOGS_DIR%\nssm_service.log
 echo.
 echo   Comandos utiles:
 echo     nssm status %SERVICE_NAME%     - Ver estado
 echo     nssm stop %SERVICE_NAME%       - Detener
 echo     nssm start %SERVICE_NAME%      - Iniciar
 echo     nssm restart %SERVICE_NAME%    - Reiniciar
-echo     nssm remove %SERVICE_NAME%     - Desinstalar
+echo.
+echo   Para desinstalar todo: ejecuta stop_service.bat
 echo.
 echo ============================================================
 pause
@@ -222,12 +244,12 @@ exit /b 0
 
 :: ============================================================
 :: Subrutina: abrir navegador en modo kiosko (pantalla completa)
-:: Usa solo --kiosk para no dejar rastro en sesion normal de Edge
+:: Edge debe estar cerrado para que --kiosk funcione correctamente
 :: ============================================================
 :OPEN_KIOSK
 set "BROWSER="
-if exist "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" set "BROWSER=C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 if exist "C:\Program Files\Microsoft\Edge\Application\msedge.exe" set "BROWSER=C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+if exist "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" set "BROWSER=C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" set "BROWSER=C:\Program Files\Google\Chrome\Application\chrome.exe"
 if exist "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" set "BROWSER=C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
 
@@ -236,10 +258,10 @@ if not defined BROWSER (
     goto :EOF
 )
 
-start "" "%BROWSER%" --kiosk --new-window --no-first-run --no-default-browser-check "%APP_URL%"
+start "" "%BROWSER%" --kiosk --new-window --no-first-run --no-default-browser-check --no-restore "%APP_URL%"
 
 :: Traer ventana al frente
-timeout /t 2 /nobreak >nul
+timeout /t 3 /nobreak >nul
 powershell -Command "Add-Type -Name W -Namespace N -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr h);'; $p = Get-Process | Where-Object { $_.MainWindowTitle -ne '' -and ($_.Name -match 'msedge|chrome') } | Select-Object -First 1; if ($p) { [N.W]::SetForegroundWindow($p.MainWindowHandle) }" >nul 2>&1
 
 goto :EOF

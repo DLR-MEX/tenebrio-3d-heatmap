@@ -96,10 +96,19 @@ powershell -Command "Get-Process msedge -ErrorAction SilentlyContinue | Where-Ob
 echo       OK
 
 :: ============================================================
-:: 5. Limpiar inicio automatico del navegador con localhost
+:: 5. Eliminar tarea programada del kiosko
 :: ============================================================
 echo.
-echo [5/5] Limpiando inicio automatico...
+echo [5/6] Eliminando tarea programada del kiosko...
+
+schtasks /delete /tn "TenebrioKiosk" /f >nul 2>&1
+echo       OK
+
+:: ============================================================
+:: 6. Limpiar inicio automatico del navegador con localhost
+:: ============================================================
+echo.
+echo [6/6] Limpiando inicio automatico...
 
 :: Eliminar entradas del registro que abran localhost al inicio
 powershell -Command "
@@ -133,10 +142,11 @@ echo ============================================================
 echo   LIMPIEZA COMPLETADA
 echo ============================================================
 echo.
-echo   Servicio:         Desinstalado
-echo   Puerto 5000:      Liberado
-echo   Navegador kiosko: Cerrado
-echo   Inicio automatico: Limpiado
+echo   Servicio:           Desinstalado
+echo   Puerto 5000:        Liberado
+echo   Navegador kiosko:   Cerrado
+echo   Tarea programada:   Eliminada
+echo   Inicio automatico:  Limpiado
 echo.
 echo   El equipo esta limpio. Para volver a instalar:
 echo   Ejecuta setup_service.bat como administrador.
