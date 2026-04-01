@@ -8,13 +8,11 @@ Flask para mostrar el dashboard del mapa de calor.
 import logging
 
 from heatmap_engine import HeatmapEngine
+from log_config import setup_logging
 from mqtt_client import MqttClient
 import visualization
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
+setup_logging(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 

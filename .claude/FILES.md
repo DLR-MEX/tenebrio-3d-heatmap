@@ -5,6 +5,7 @@ tenebrios/
 │
 ├── backend/
 │   ├── config.py
+│   ├── log_config.py
 │   ├── main.py
 │   ├── mqtt_client.py
 │   ├── heatmap_engine.py
@@ -17,5 +18,8 @@ tenebrios/
 │   ├── test_interpolation.py
 │   └── test_mqtt_parser.py
 │
-└── requirements.txt
-└── prompts.txt
+├── requirements.txt
+├── prompts.txt
+├── setup_service.bat
+├── restart_service.bat
+└── stop_service.bat
