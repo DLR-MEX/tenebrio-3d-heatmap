@@ -82,13 +82,46 @@ powershell -Command "Get-NetTCPConnection -LocalPort 5000 -ErrorAction SilentlyC
 echo       OK
 
 :: ============================================================
-:: 4. Cerrar navegador en modo kiosko
+:: 4. Cerrar navegador en modo kiosko y limpiar rastros
 :: ============================================================
 echo.
-echo [4/4] Cerrando navegador en modo kiosko...
+echo [4/5] Cerrando navegador en modo kiosko...
 
-:: Cerrar ventanas de Edge/Chrome que tengan localhost:5000
-powershell -Command "Get-Process msedge,chrome -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -match 'localhost|Tenebrio|Heatmap' } | Stop-Process -Force -ErrorAction SilentlyContinue" >nul 2>&1
+:: Matar todos los procesos de Edge y Chrome que usen --kiosk
+powershell -Command "Get-WmiObject Win32_Process -Filter \"Name='msedge.exe' OR Name='chrome.exe'\" | Where-Object { $_.CommandLine -match 'kiosk|localhost:5000' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
+
+:: Si Edge quedo con sesion de localhost, limpiar la restauracion
+powershell -Command "Get-Process msedge -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -match 'localhost|5000|Tenebrio|Heatmap' } | Stop-Process -Force -ErrorAction SilentlyContinue" >nul 2>&1
+
+echo       OK
+
+:: ============================================================
+:: 5. Limpiar inicio automatico del navegador con localhost
+:: ============================================================
+echo.
+echo [5/5] Limpiando inicio automatico...
+
+:: Eliminar entradas del registro que abran localhost al inicio
+powershell -Command "
+$paths = @('HKCU:\Software\Microsoft\Windows\CurrentVersion\Run','HKLM:\Software\Microsoft\Windows\CurrentVersion\Run');
+foreach ($p in $paths) {
+    Get-ItemProperty -Path $p -ErrorAction SilentlyContinue | ForEach-Object {
+        $_.PSObject.Properties | Where-Object { $_.Value -match 'localhost:5000|kiosk' } | ForEach-Object {
+            Remove-ItemProperty -Path $p -Name $_.Name -Force -ErrorAction SilentlyContinue;
+            Write-Host ('      Eliminado del registro: ' + $_.Name)
+        }
+    }
+}
+" 2>nul
+
+:: Eliminar del Startup del usuario
+powershell -Command "
+$startup = [Environment]::GetFolderPath('Startup');
+Get-ChildItem $startup -ErrorAction SilentlyContinue | Where-Object { (Get-Content $_.FullName -ErrorAction SilentlyContinue) -match 'localhost:5000|kiosk|TenebrioHeatmap' } | ForEach-Object {
+    Remove-Item $_.FullName -Force;
+    Write-Host ('      Eliminado de Startup: ' + $_.Name)
+}
+" 2>nul
 
 echo       OK
 
@@ -103,6 +136,7 @@ echo.
 echo   Servicio:         Desinstalado
 echo   Puerto 5000:      Liberado
 echo   Navegador kiosko: Cerrado
+echo   Inicio automatico: Limpiado
 echo.
 echo   El equipo esta limpio. Para volver a instalar:
 echo   Ejecuta setup_service.bat como administrador.
