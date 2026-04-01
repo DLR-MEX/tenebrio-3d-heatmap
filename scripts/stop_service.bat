@@ -93,7 +93,7 @@ powershell -Command "Get-WmiObject Win32_Process -Filter \"Name='cmd.exe'\" | Wh
 echo       OK
 
 :: ============================================================
-:: 5. Cerrar navegador en modo kiosko
+:: 5. Cerrar navegador en modo kiosko y restaurar barra de tareas
 :: ============================================================
 echo.
 echo [5/7] Cerrando navegador en modo kiosko...
@@ -103,6 +103,12 @@ powershell -Command "Get-WmiObject Win32_Process -Filter \"Name='chrome.exe'\" |
 
 :: Matar Edge residual
 taskkill /F /IM msedge.exe >nul 2>&1
+
+:: Restaurar barra de tareas (desactivar auto-ocultar)
+echo       Restaurando barra de tareas...
+powershell -Command "$p = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3'; $v = (Get-ItemProperty -Path $p).Settings; $v[8] = 2; Set-ItemProperty -Path $p -Name Settings -Value $v" >nul 2>&1
+powershell -Command "Stop-Process -Name explorer -Force" >nul 2>&1
+timeout /t 3 /nobreak >nul
 
 echo       OK
 

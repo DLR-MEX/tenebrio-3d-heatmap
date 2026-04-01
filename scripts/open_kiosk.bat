@@ -22,5 +22,11 @@ if exist "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" set "BROW
 
 if not defined BROWSER exit /b 1
 
+:: Ocultar barra de tareas automaticamente
+powershell -Command "$p = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3'; $v = (Get-ItemProperty -Path $p).Settings; $v[8] = 3; Set-ItemProperty -Path $p -Name Settings -Value $v" >nul 2>&1
+:: Reiniciar explorer para aplicar (no cierra ventanas del usuario)
+powershell -Command "Stop-Process -Name explorer -Force" >nul 2>&1
+timeout /t 3 /nobreak >nul
+
 :: Abrir Chrome en modo kiosko
 start "" "%BROWSER%" --kiosk --new-window --no-first-run --no-default-browser-check --no-restore --disable-translate --disable-extensions "%APP_URL%"

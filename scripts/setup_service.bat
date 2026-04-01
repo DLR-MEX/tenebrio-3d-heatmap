@@ -268,6 +268,11 @@ if not defined BROWSER (
     goto :EOF
 )
 
+:: Ocultar barra de tareas automaticamente
+powershell -Command "$p = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StuckRects3'; $v = (Get-ItemProperty -Path $p).Settings; $v[8] = 3; Set-ItemProperty -Path $p -Name Settings -Value $v" >nul 2>&1
+powershell -Command "Stop-Process -Name explorer -Force" >nul 2>&1
+timeout /t 3 /nobreak >nul
+
 start "" "%BROWSER%" --kiosk --new-window --no-first-run --no-default-browser-check --no-restore --disable-translate --disable-extensions "%APP_URL%"
 
 :: Traer ventana al frente
