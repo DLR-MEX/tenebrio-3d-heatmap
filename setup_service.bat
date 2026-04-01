@@ -16,6 +16,7 @@ set "REQUIREMENTS=%PROJECT_DIR%requirements.txt"
 set "MAIN_SCRIPT=%BACKEND_DIR%\main.py"
 set "LOGS_DIR=%PROJECT_DIR%logs"
 set "APP_URL=http://localhost:5000"
+set "WAIT_SECONDS=8"
 
 :: Quitar barra final de las rutas (NSSM puede fallar con ella)
 if "%PROJECT_DIR:~-1%"=="\" set "PROJECT_DIR=%PROJECT_DIR:~0,-1%"
@@ -181,6 +182,18 @@ if %errorlevel% neq 0 (
 )
 
 echo       Servicio iniciado correctamente.
+echo.
+echo       Esperando %WAIT_SECONDS% segundos para que el servidor arranque...
+timeout /t %WAIT_SECONDS% /nobreak >nul
+
+:: Matar cualquier navegador que tenga localhost:5000 de sesiones anteriores
+echo       Cerrando sesiones anteriores del navegador...
+powershell -Command "Get-WmiObject Win32_Process -Filter \"Name='msedge.exe' OR Name='chrome.exe'\" | Where-Object { $_.CommandLine -match 'localhost:5000' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
+timeout /t 2 /nobreak >nul
+
+:: Abrir navegador en modo kiosko
+echo       Abriendo navegador en modo kiosko...
+call :OPEN_KIOSK
 
 :: ============================================================
 :: Resumen final
@@ -203,8 +216,30 @@ echo     nssm start %SERVICE_NAME%      - Iniciar
 echo     nssm restart %SERVICE_NAME%    - Reiniciar
 echo     nssm remove %SERVICE_NAME%     - Desinstalar
 echo.
-echo   Para abrir el dashboard:
-echo     Abre un navegador en %APP_URL%
-echo.
 echo ============================================================
 pause
+exit /b 0
+
+:: ============================================================
+:: Subrutina: abrir navegador en modo kiosko (pantalla completa)
+:: Usa solo --kiosk para no dejar rastro en sesion normal de Edge
+:: ============================================================
+:OPEN_KIOSK
+set "BROWSER="
+if exist "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" set "BROWSER=C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+if exist "C:\Program Files\Microsoft\Edge\Application\msedge.exe" set "BROWSER=C:\Program Files\Microsoft\Edge\Application\msedge.exe"
+if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" set "BROWSER=C:\Program Files\Google\Chrome\Application\chrome.exe"
+if exist "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" set "BROWSER=C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
+
+if not defined BROWSER (
+    echo [AVISO] No se encontro Edge ni Chrome.
+    goto :EOF
+)
+
+start "" "%BROWSER%" --kiosk --new-window --no-first-run --no-default-browser-check "%APP_URL%"
+
+:: Traer ventana al frente
+timeout /t 2 /nobreak >nul
+powershell -Command "Add-Type -Name W -Namespace N -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr h);'; $p = Get-Process | Where-Object { $_.MainWindowTitle -ne '' -and ($_.Name -match 'msedge|chrome') } | Select-Object -First 1; if ($p) { [N.W]::SetForegroundWindow($p.MainWindowHandle) }" >nul 2>&1
+
+goto :EOF
