@@ -190,18 +190,23 @@ echo.
 echo [8/8] Configurando kiosko automatico al iniciar sesion...
 
 set "KIOSK_SCRIPT=%~dp0open_kiosk.bat"
-set "TASK_NAME=TenebrioKiosk"
 
-:: Eliminar tarea anterior si existe
-schtasks /delete /tn "%TASK_NAME%" /f >nul 2>&1
+:: Eliminar tarea programada anterior si existe
+schtasks /delete /tn "TenebrioKiosk" /f >nul 2>&1
 
-:: Crear tarea que se ejecuta al iniciar sesion de cualquier usuario
-schtasks /create /tn "%TASK_NAME%" /tr "\"%KIOSK_SCRIPT%\"" /sc onlogon /rl highest /f >nul 2>&1
+:: Crear acceso directo en la carpeta Startup del usuario actual
+:: Esto garantiza que se ejecute con interfaz grafica visible
+set "STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
+set "SHORTCUT=%STARTUP_FOLDER%\TenebrioKiosk.bat"
+
+:: Copiar open_kiosk.bat a la carpeta Startup
+copy /Y "%KIOSK_SCRIPT%" "%SHORTCUT%" >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [AVISO] No se pudo crear la tarea programada.
+    echo [AVISO] No se pudo copiar a la carpeta Startup.
     echo         El kiosko no se abrira automaticamente al encender.
 ) else (
     echo       OK - Kiosko se abrira automaticamente al iniciar sesion.
+    echo       Ubicacion: %SHORTCUT%
 )
 
 :: Abrir kiosko ahora

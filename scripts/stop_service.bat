@@ -107,12 +107,17 @@ taskkill /F /IM msedge.exe >nul 2>&1
 echo       OK
 
 :: ============================================================
-:: 6. Eliminar tarea programada del kiosko
+:: 6. Eliminar kiosko del inicio de sesion
 :: ============================================================
 echo.
-echo [6/7] Eliminando tarea programada del kiosko...
+echo [6/7] Eliminando kiosko del inicio de sesion...
 
+:: Eliminar tarea programada si existe
 schtasks /delete /tn "TenebrioKiosk" /f >nul 2>&1
+
+:: Eliminar archivo de la carpeta Startup
+del "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\TenebrioKiosk.bat" >nul 2>&1
+
 echo       OK
 
 :: ============================================================
@@ -157,7 +162,7 @@ echo   Servicio:           Desinstalado
 echo   Puerto 5000:        Liberado
 echo   Vigilante Edge:     Detenido
 echo   Navegador kiosko:   Cerrado
-echo   Tarea programada:   Eliminada
+echo   Inicio de sesion:   Limpiado
 echo   Inicio automatico:  Limpiado
 echo.
 echo   El equipo esta limpio. Para volver a instalar:
