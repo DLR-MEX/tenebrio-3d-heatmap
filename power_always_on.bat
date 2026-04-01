@@ -28,17 +28,20 @@ echo.
 :: ============================================================
 echo [1/5] Creando plan de energia "Tenebrio 24/7"...
 
-:: GUID fijo para poder identificar y actualizar el plan
-set "PLAN_GUID=e9a42b02-d5df-448d-aa00-03f14749eb61"
+:: Buscar si ya existe un plan "Tenebrio 24/7"
+set "PLAN_GUID="
+for /f "tokens=4" %%g in ('powercfg /list ^| findstr /I "Tenebrio"') do set "PLAN_GUID=%%g"
 
-:: Verificar si el plan ya existe
-powercfg /list | findstr /I "%PLAN_GUID%" >nul 2>&1
-if %errorlevel% equ 0 (
+if defined PLAN_GUID (
     echo       Plan ya existe. Actualizando configuracion...
 ) else (
-    :: Duplicar el plan activo y renombrarlo
-    powercfg /duplicatescheme 381b4222-f694-41f0-9685-ff5bb260df2e %PLAN_GUID% >nul 2>&1
-    if %errorlevel% neq 0 (
+    :: Obtener el plan activo para duplicarlo
+    for /f "tokens=4" %%g in ('powercfg /getactivescheme') do set "ACTIVE_GUID=%%g"
+
+    :: Duplicar el plan activo
+    for /f "tokens=4" %%g in ('powercfg /duplicatescheme !ACTIVE_GUID!') do set "PLAN_GUID=%%g"
+
+    if not defined PLAN_GUID (
         echo [ERROR] No se pudo crear el plan de energia.
         pause
         exit /b 1
