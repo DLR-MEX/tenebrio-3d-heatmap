@@ -18,13 +18,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     engine = HeatmapEngine()
-
-    def on_mqtt_data(data):
-        """Actualiza datos y pre-calcula la interpolación para que el caché esté listo."""
-        engine.update(data)
-        engine.interpolate_volume()
-
-    client = MqttClient(on_data=on_mqtt_data)
+    client = MqttClient(on_data=engine.update)
 
     visualization.set_engine(engine)
     visualization.set_mqtt_status(client.is_connected)

@@ -28,7 +28,6 @@ class HeatmapEngine:
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._recompute_lock = threading.Lock()
 
         self._temperatures: dict[str, float] = {}
         self._exterior_temp: Optional[float] = None
@@ -41,11 +40,6 @@ class HeatmapEngine:
         self._radiant_floor: dict[str, float] = {}
         self._machine_room: dict[str, float] = {}
         self._last_update: Optional[str] = None
-
-        # Caché de interpolación: solo se recalcula cuando llegan datos nuevos
-        self._dirty: bool = False
-        self._cached_temp_volume: Optional[dict] = None
-        self._cached_humidity_volume: Optional[dict] = None
 
         self._sensor_labels = list(config.SENSOR_POSITIONS.keys())
         self._sensor_coords = np.array(
@@ -125,48 +119,22 @@ class HeatmapEngine:
             if config.AMMONIA_LABEL in data:
                 self._ammonia_ppm = data[config.AMMONIA_LABEL]
 
-            # Marcar caché como obsoleto para recalcular en la próxima consulta
-            self._dirty = True
-
     # ------------------------------------------------------------------
-    # Interpolación 3D (con caché)
+    # Interpolación 3D
     # ------------------------------------------------------------------
 
-    def _recompute_if_dirty(self) -> None:
-        """Recalcula la interpolación solo si hay datos nuevos desde el último cómputo.
+    def interpolate_volume(self) -> Optional[dict]:
+        """Retorna arreglos de volumen 3D aplanados para Plotly, o None si no hay datos suficientes.
 
-        Usa un lock separado para evitar que múltiples clientes
-        ejecuten griddata simultáneamente. Si otro hilo ya está
-        computando, este espera a que termine y usa el resultado cacheado.
+        Retorna dict con claves: x, y, z, value (todos listas 1D).
         """
-        with self._recompute_lock:
-            if not self._dirty:
-                return
-
-            # Tomar snapshot de datos bajo el lock de datos
-            with self._lock:
-                temp_snapshot = dict(self._temperatures)
-                humidity_snapshot = dict(self._humidity)
-                self._dirty = False
-
-            # Interpolar fuera del lock (operación costosa, no bloquea update())
-            logger.debug("Recalculando interpolación 3D (datos nuevos)")
-            temp_vol = self._do_interpolate_temp(temp_snapshot)
-            hum_vol = self._do_interpolate_humidity(humidity_snapshot)
-
-            # Guardar resultados en caché
-            with self._lock:
-                self._cached_temp_volume = temp_vol
-                self._cached_humidity_volume = hum_vol
-
-    def _do_interpolate_temp(self, temp_data: dict) -> Optional[dict]:
-        """Ejecuta la interpolación 3D de temperatura sobre un snapshot de datos."""
-        values = []
-        coords = []
-        for i, label in enumerate(self._sensor_labels):
-            if label in temp_data:
-                values.append(temp_data[label])
-                coords.append(self._sensor_coords[i])
+        with self._lock:
+            values = []
+            coords = []
+            for i, label in enumerate(self._sensor_labels):
+                if label in self._temperatures:
+                    values.append(self._temperatures[label])
+                    coords.append(self._sensor_coords[i])
 
         if len(values) < 3:
             return None
@@ -174,9 +142,12 @@ class HeatmapEngine:
         coords_arr = np.array(coords)
         values_arr = np.array(values)
 
+        # Vecino más cercano siempre funciona y llena todo el volumen
         volume = griddata(
             coords_arr, values_arr, self._grid_points, method="nearest"
         )
+
+        # Intenta lineal para mejor calidad dentro del casco convexo, mantiene nearest fuera
         try:
             linear = griddata(
                 coords_arr, values_arr, self._grid_points, method="linear"
@@ -195,15 +166,19 @@ class HeatmapEngine:
             "value": volume.tolist(),
         }
 
-    def _do_interpolate_humidity(self, humidity_data: dict) -> Optional[dict]:
-        """Ejecuta la interpolación 3D de humedad sobre un snapshot de datos."""
+    def interpolate_humidity_volume(self) -> Optional[dict]:
+        """Retorna volumen 3D de humedad interpolada, o None si no hay datos suficientes.
+
+        Los sensores h1-h5 comparten posiciones con t1-t5.
+        """
         humidity_map = {"h1": 0, "h2": 1, "h3": 2, "h4": 3, "h5": 4}
-        values = []
-        coords = []
-        for hlabel, idx in humidity_map.items():
-            if hlabel in humidity_data:
-                values.append(humidity_data[hlabel])
-                coords.append(self._sensor_coords[idx])
+        with self._lock:
+            values = []
+            coords = []
+            for hlabel, idx in humidity_map.items():
+                if hlabel in self._humidity:
+                    values.append(self._humidity[hlabel])
+                    coords.append(self._sensor_coords[idx])
 
         if len(values) < 3:
             return None
@@ -231,18 +206,6 @@ class HeatmapEngine:
             "z": self._grid_z.tolist(),
             "value": volume.tolist(),
         }
-
-    def interpolate_volume(self) -> Optional[dict]:
-        """Retorna volumen 3D cacheado para Plotly. Recalcula solo si hay datos nuevos."""
-        self._recompute_if_dirty()
-        with self._lock:
-            return self._cached_temp_volume
-
-    def interpolate_humidity_volume(self) -> Optional[dict]:
-        """Retorna volumen 3D de humedad cacheado. Recalcula solo si hay datos nuevos."""
-        self._recompute_if_dirty()
-        with self._lock:
-            return self._cached_humidity_volume
 
     # ------------------------------------------------------------------
     # Accesores
